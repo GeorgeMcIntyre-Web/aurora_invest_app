@@ -10,6 +10,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['lib/**/*.test.ts', 'lib/**/*.spec.ts'],
+    include: ['**/*.test.ts', '**/*.spec.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
+    // Ensure TypeScript files are properly transformed
+    transformMode: {
+      ssr: [/\.[jt]sx?$/],
+    },
   },
 });
