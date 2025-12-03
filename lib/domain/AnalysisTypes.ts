@@ -133,3 +133,15 @@ export interface AnalysisResult {
 export interface AnalysisOptions {
   horizonMonths?: number;
 }
+
+export interface HistoricalDataPoint {
+  date: string; // ISO date
+  price: number;
+  volume: number;
+}
+
+export interface HistoricalData {
+  ticker: string;
+  period: '1M' | '3M' | '6M' | '1Y' | '5Y';
+  dataPoints: HistoricalDataPoint[];
+}

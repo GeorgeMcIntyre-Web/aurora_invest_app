@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { StockForm } from '@/components/stock-form';
 import { AnalysisDashboard } from '@/components/analysis-dashboard';
-import { UserProfile, AnalysisResult, StockData } from '@/lib/domain/AnalysisTypes';
+import { UserProfile, AnalysisResult, StockData, HistoricalData } from '@/lib/domain/AnalysisTypes';
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
 
@@ -20,6 +20,8 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 500;
 const DEMO_TICKERS = ['AAPL', 'MSFT', 'TSLA', 'GOOGL', 'NVDA'];
+type HistoricalPeriod = HistoricalData['period'];
+const HISTORICAL_PERIODS: HistoricalPeriod[] = ['1M', '3M', '6M', '1Y', '5Y'];
 
 type LoadingStage = 'idle' | 'fetching' | 'analyzing' | 'presenting';
 
@@ -254,6 +256,27 @@ const fetchStockDataWithResilience = async (
   throw friendly;
 };
 
+const fetchHistoricalSeries = async (ticker: string): Promise<Record<HistoricalPeriod, HistoricalData>> => {
+  if (!marketDataService?.fetchHistoricalData) {
+    throw new Error('Historical data service unavailable.');
+  }
+
+  const entries = await Promise.all(
+    HISTORICAL_PERIODS.map(async (period) => {
+      const dataset = await withTimeout(
+        marketDataService.fetchHistoricalData(ticker, period),
+        FETCH_TIMEOUT_MS
+      );
+      return [period, dataset] as const;
+    })
+  );
+
+  return entries.reduce<Record<HistoricalPeriod, HistoricalData>>((acc, [period, dataset]) => {
+    acc[period] = dataset;
+    return acc;
+  }, {} as Record<HistoricalPeriod, HistoricalData>);
+};
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorDetail, setErrorDetail] = useState<UserFriendlyError | null>(null);
@@ -262,6 +285,13 @@ export default function Home() {
   const [loadingStage, setLoadingStage] = useState<LoadingStage>('idle');
   const [progressPercent, setProgressPercent] = useState(0);
   const [isCancellationPending, setIsCancellationPending] = useState(false);
+  const [historicalSeries, setHistoricalSeries] = useState<
+    Partial<Record<HistoricalPeriod, HistoricalData>>
+  >({});
+  const [selectedHistoricalPeriod, setSelectedHistoricalPeriod] =
+    useState<HistoricalPeriod>('6M');
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+  const [historicalError, setHistoricalError] = useState<string | null>(null);
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [queuedCount, setQueuedCount] = useState(0);
@@ -280,6 +310,10 @@ export default function Home() {
     setProgressPercent(0);
     setIsCancellationPending(false);
     cancelRequested.current = false;
+  };
+
+  const handleHistoricalPeriodChange = (period: HistoricalPeriod) => {
+    setSelectedHistoricalPeriod(period);
   };
 
   const updateQueuedCount = () => setQueuedCount(requestQueue.current.length);
@@ -324,6 +358,31 @@ export default function Home() {
     }
   };
 
+  const startHistoricalFetch = (ticker: string, resetSelection = true) => {
+    if (resetSelection) {
+      setSelectedHistoricalPeriod('6M');
+    }
+    setHistoricalSeries({});
+    setHistoricalError(null);
+    setHistoricalLoading(true);
+
+    return fetchHistoricalSeries(ticker)
+      .then((series) => {
+        if (series) {
+          setHistoricalSeries(series);
+        }
+        return series;
+      })
+      .catch((error) => {
+        console.error(error);
+        setHistoricalError('Unable to load historical pricing data.');
+        return null;
+      })
+      .finally(() => {
+        setHistoricalLoading(false);
+      });
+  };
+
   const hydrateFromCache = (entry: CachedAnalysisRecord) => {
     setErrorDetail(null);
     setResult(entry.result);
@@ -353,6 +412,8 @@ export default function Home() {
         throw CANCELLATION_ERROR;
       }
 
+      const historicalPromise = startHistoricalFetch(request.ticker);
+
       applyStage('analyzing');
 
       const analysisResult = analyzeStock(request.profile, stockData);
@@ -370,6 +431,11 @@ export default function Home() {
 
       applyStage('presenting');
       setProgressPercent(100);
+
+      await historicalPromise;
+      if (cancelRequested.current) {
+        throw CANCELLATION_ERROR;
+      }
 
       setStock(stockData);
       setResult(analysisResult);
@@ -435,6 +501,7 @@ export default function Home() {
 
     if (cachedEntry) {
       hydrateFromCache(cachedEntry);
+    void startHistoricalFetch(normalizedTicker);
       return;
     }
 
@@ -658,7 +725,15 @@ export default function Home() {
             )}
 
             {result && stock && !isLoading && (
-              <AnalysisDashboard result={result} stock={stock} />
+              <AnalysisDashboard
+                result={result}
+                stock={stock}
+                historicalSeries={historicalSeries}
+                selectedPeriod={selectedHistoricalPeriod}
+                onPeriodChange={handleHistoricalPeriodChange}
+                historicalLoading={historicalLoading}
+                historicalError={historicalError}
+              />
             )}
           </div>
         </div>

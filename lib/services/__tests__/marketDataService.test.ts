@@ -59,6 +59,26 @@ describe('MockMarketDataService', () => {
     await vi.runAllTimersAsync();
     await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.NVDA);
   });
+
+  it('returns synthetic historical data with deterministic pricing', async () => {
+    vi.useFakeTimers();
+    const service = new MockMarketDataService();
+
+    const resultPromise = service.fetchHistoricalData('AAPL', '3M');
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.ticker).toBe('AAPL');
+    expect(result.period).toBe('3M');
+    expect(result.dataPoints.length).toBeGreaterThan(40);
+    expect(result.dataPoints[0].price).toBeGreaterThan(0);
+    expect(result.dataPoints[result.dataPoints.length - 1].price).toBeGreaterThan(0);
+  });
+
+  it('rejects when requesting historical data with an empty ticker', async () => {
+    const service = new MockMarketDataService();
+    await expect(service.fetchHistoricalData('', '1M')).rejects.toThrow('Ticker is required');
+  });
 });
 
 describe('createMarketDataService', () => {
@@ -83,5 +103,15 @@ describe('marketDataService singleton', () => {
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.GOOGL);
+  });
+
+  it('supports historical data on the default singleton', async () => {
+    vi.useFakeTimers();
+    const resultPromise = marketDataService.fetchHistoricalData('MSFT', '1M');
+    await vi.runAllTimersAsync();
+
+    const result = await resultPromise;
+    expect(result.ticker).toBe('MSFT');
+    expect(result.dataPoints.length).toBeGreaterThan(10);
   });
 });
