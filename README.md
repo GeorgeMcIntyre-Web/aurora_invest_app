@@ -11,6 +11,7 @@ A production-ready investment analysis tool that provides comprehensive stock an
   - Fundamentals & Valuation (P/E ratios, growth rates, margins)
   - Technical Analysis (trend, momentum, price positioning)
   - Market Sentiment (analyst consensus, price targets, news)
+- **Pluggable Market Data**: Switch between mock data and a live Finnhub API integration with retries, timeouts, and graceful fallbacks
 - **3-Month Scenario Engine**: Bull/Base/Bear projections with probabilities
 - **Framework-Based Guidance**: Position sizing, timing, risk considerations
 - **Interactive Visualizations**: Charts for scenarios, fundamentals, technicals
@@ -31,6 +32,10 @@ yarn install
 
 # Run development server
 yarn dev
+
+# or, if you prefer npm
+npm install
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
@@ -40,7 +45,29 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ```bash
 yarn build
 yarn start
+
+# or with npm
+npm run build
+npm start
 ```
+
+### Environment Variables
+
+1. Copy the sample file and provide your own values:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Update `.env.local` with the following keys:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_MARKET_DATA_PROVIDER` | `demo` | `demo` keeps using mock data, `finnhub` enables the live API |
+| `NEXT_PUBLIC_FINNHUB_API_KEY` | _(none)_ | Required when `NEXT_PUBLIC_MARKET_DATA_PROVIDER=finnhub` |
+| `NEXT_PUBLIC_MARKET_DATA_TIMEOUT_MS` | `10000` | Client-side timeout for Finnhub requests (in ms) |
+| `NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES` | `2` | How many retries the client should attempt after failures |
+| `NEXT_PUBLIC_MARKET_DATA_BACKOFF_MS` | `500` | Base delay (ms) used for exponential backoff between retries |
+
+> `.env.local` is ignored by git. Never commit real API keys.
 
 ## 📊 Available Stocks (Mock Data)
 
@@ -81,12 +108,35 @@ aurora_invest_app/
 │   │   ├── AnalysisTypes.ts        # Core type definitions
 │   │   └── auroraEngine.ts         # Pure analysis engine
 │   ├── services/
-│   │   └── marketDataService.ts    # Data abstraction layer
+│   │   ├── marketDataService.ts    # Data abstraction layer + factory
+│   │   └── implementations/
+│   │       └── FinnhubMarketDataService.ts
 │   └── data/
 │       └── mockData.ts             # Mock stock data
 └── public/
     └── favicon.svg                 # Brand icon
 ```
+
+### Market Data Providers
+
+- `lib/services/marketDataService.ts` now acts as a factory that chooses the active data source.
+- Demo mode (default) keeps using `MockMarketDataService` and bundled sample data.
+- Live mode instantiates `FinnhubMarketDataService`, which provides:
+  - Request timeouts (default 10 seconds)
+  - Two automatic retries with exponential backoff (configurable)
+  - Graceful handling of rate limits, network failures, and missing symbols
+  - Mapping of Finnhub fundamentals, technicals, and sentiment data to the app's `StockData` type
+
+To enable Finnhub:
+
+```bash
+cp .env.example .env.local
+echo "NEXT_PUBLIC_FINNHUB_API_KEY=your_key" >> .env.local
+echo "NEXT_PUBLIC_MARKET_DATA_PROVIDER=finnhub" >> .env.local
+npm run dev
+```
+
+To switch back to the demo data, set `NEXT_PUBLIC_MARKET_DATA_PROVIDER=demo` (or remove the env var) and restart `npm run dev`.
 
 ## 🧠 Analysis Engine
 
