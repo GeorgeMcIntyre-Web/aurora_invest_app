@@ -133,6 +133,29 @@ MIT License - See LICENSE file for details
 
 Contributions are welcome! Please open an issue or submit a pull request.
 
+### 📚 Documentation for Contributors
+
+This codebase is designed for multi-agent collaboration. Before contributing, please read:
+
+- **[AGENT_ASSIGNMENTS.md](./AGENT_ASSIGNMENTS.md)** - **⭐ START HERE!** Simple list: Agent number, name, file to read
+- **[AGENT_ROLES.md](./AGENT_ROLES.md)** - **⚠️ READ SECOND!** Hard constraints and verification requirements
+- **[AGENT_INDEX.md](./AGENT_INDEX.md)** - Quick navigation to all documentation
+- **[AGENT_PROMPTS.md](./AGENT_PROMPTS.md)** - **Ready-to-use prompts for specific agent roles** ⭐
+- **[AGENT_GUIDE.md](./AGENT_GUIDE.md)** - Comprehensive guide for AI agents with mega prompts for common tasks
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Detailed system architecture and design decisions
+- **[MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)** - Clear module boundaries and separation of concerns
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Coding patterns, conventions, and best practices
+
+### 🚀 Quick Start for Agents
+
+1. **Read `AGENT_ASSIGNMENTS.md` first** - Find your agent number and file to read
+2. **Read `AGENT_ROLES.md` second** - Understand hard constraints and verification requirements
+2. **Read your specific section in `AGENT_PROMPTS.md`** - Get your detailed task instructions
+3. Review `ARCHITECTURE.md` to understand system structure
+4. Check `MODULE_BOUNDARIES.md` to understand where code should live
+5. Follow patterns in `CONTRIBUTING.md` when writing code
+6. **Always verify with real commands** - See `AGENT_ROLES.md` for verification requirements
+
 ---
 
 **Built with ❤️ by the AuroraInvest Team**

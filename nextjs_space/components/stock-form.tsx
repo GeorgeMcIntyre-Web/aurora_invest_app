@@ -14,13 +14,17 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
   const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>('moderate');
   const [horizon, setHorizon] = useState<InvestmentHorizon>('5-10');
   const [objective, setObjective] = useState<InvestmentObjective>('growth');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e?.preventDefault?.();
     
     if (!ticker || ticker?.trim?.()?.length === 0) {
+      setValidationError('Please enter a stock ticker (e.g., AAPL, MSFT, TSLA).');
       return;
     }
+
+    setValidationError(null);
 
     onAnalyze?.(ticker?.toUpperCase?.(), {
       riskTolerance,
@@ -55,6 +59,9 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
             />
           </div>
           <p className="text-xs text-ai-muted mt-1">Available: AAPL, MSFT, TSLA, GOOGL, NVDA</p>
+          {validationError && (
+            <p className="mt-1 text-xs text-red-400">{validationError}</p>
+          )}
         </div>
 
         {/* Risk Tolerance */}

@@ -1,4 +1,13 @@
-// Pure analysis engine for AuroraInvest Stock Analyzer
+/**
+ * Pure analysis engine for AuroraInvest Stock Analyzer
+ * 
+ * This module contains all business logic for stock analysis. All functions are pure
+ * (no side effects, deterministic output). This allows the engine to be easily tested
+ * and used in different contexts (client-side, server-side, etc.).
+ * 
+ * @module auroraEngine
+ */
+
 import {
   UserProfile,
   StockData,
@@ -11,7 +20,27 @@ import {
   AnalystConsensus,
 } from './AnalysisTypes';
 
-// Fundamentals classification
+/**
+ * Classifies stock fundamentals as 'strong', 'ok', 'weak', or 'unknown'.
+ * 
+ * Classification criteria:
+ * - **Strong**: EPS growth > 15%, net margin > 20%, FCF yield > 3%, ROE > 20%
+ * - **Weak**: EPS growth < 5% AND net margin < 10%
+ * - **OK**: Everything else (moderate fundamentals)
+ * - **Unknown**: Missing fundamentals data
+ * 
+ * @param stock - Stock data containing fundamentals
+ * @returns Classification string indicating fundamentals strength
+ * 
+ * @example
+ * ```typescript
+ * const classification = classifyFundamentals({
+ *   ticker: 'AAPL',
+ *   fundamentals: { epsGrowthYoYPct: 20, netMarginPct: 25, ... }
+ * });
+ * // Returns: 'strong'
+ * ```
+ */
 function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unknown' {
   const f = stock?.fundamentals;
   if (!f) {
@@ -37,7 +66,18 @@ function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unk
   return 'ok';
 }
 
-// Valuation classification
+/**
+ * Classifies stock valuation as 'cheap', 'fair', 'rich', or 'unknown'.
+ * 
+ * Uses PEG ratio (Price/Earnings to Growth) as the primary metric:
+ * - **Cheap**: PEG < 1.0 AND forward P/E < 20
+ * - **Rich**: PEG > 2.5 OR forward P/E > 40
+ * - **Fair**: Everything else (moderate valuation)
+ * - **Unknown**: Missing valuation data
+ * 
+ * @param stock - Stock data containing fundamentals
+ * @returns Classification string indicating valuation level
+ */
 function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unknown' {
   const f = stock?.fundamentals;
   if (!f) {
@@ -62,7 +102,27 @@ function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unkno
   return 'fair';
 }
 
-// Technical analysis
+/**
+ * Analyzes technical indicators to determine trend, momentum, and price position.
+ * 
+ * **Trend Analysis** (using moving averages):
+ * - Bullish: Price > SMA50 > SMA200 (uptrend)
+ * - Bearish: Price < SMA50 < SMA200 (downtrend)
+ * - Neutral: Mixed or missing data
+ * 
+ * **Momentum Analysis** (using RSI):
+ * - Overbought: RSI > 70
+ * - Oversold: RSI < 30
+ * - Neutral: RSI between 30-70
+ * 
+ * **Price Position** (using 52-week range):
+ * - Near 52-week high: Price in top 20% of range
+ * - Near 52-week low: Price in bottom 20% of range
+ * - Mid-range: Everything else
+ * 
+ * @param stock - Stock data containing technical indicators
+ * @returns Object with trend, momentum, and price position analysis
+ */
 function analyzeTechnicals(stock: StockData): {
   trend: 'bullish' | 'bearish' | 'neutral';
   momentum: 'overbought' | 'oversold' | 'neutral';
@@ -124,7 +184,21 @@ function analyzeTechnicals(stock: StockData): {
   return { trend, momentum, pricePosition };
 }
 
-// Sentiment analysis
+/**
+ * Analyzes market sentiment based on analyst consensus, price targets, and news themes.
+ * 
+ * **Analyst Consensus**: Maps analyst consensus rating to human-readable text.
+ * 
+ * **Target vs Price**: Calculates upside/downside based on analyst target mean:
+ * - Significant upside: > 15% above current price
+ * - Downside risk: > 15% below current price
+ * - Limited movement: Within ±15%
+ * 
+ * **News Themes**: Extracts first 3 news themes and formats as highlight.
+ * 
+ * @param stock - Stock data containing sentiment information
+ * @returns Object with consensus text, target analysis, and news highlight
+ */
 function analyzeSentiment(stock: StockData): {
   consensusText: string;
   targetVsPrice: string;
@@ -180,7 +254,27 @@ function analyzeSentiment(stock: StockData): {
   return { consensusText, targetVsPrice, newsHighlight };
 }
 
-// Generate 3-month scenarios
+/**
+ * Generates Bull/Base/Bear scenario projections for the specified time horizon.
+ * 
+ * Creates three scenarios with probability-weighted return ranges:
+ * - **Bull Scenario**: 25% probability, positive return range
+ * - **Base Scenario**: 50% probability, moderate return range
+ * - **Bear Scenario**: 25% probability, negative return range
+ * 
+ * Return ranges are adjusted based on user risk tolerance:
+ * - High risk tolerance: Wider ranges (more volatility)
+ * - Low risk tolerance: Narrower ranges (less volatility)
+ * 
+ * Also calculates a probability-weighted point estimate for expected return.
+ * 
+ * **Important**: These scenarios are illustrative only and do not constitute predictions.
+ * 
+ * @param user - User profile (risk tolerance affects scenario ranges)
+ * @param stock - Stock data (currently not used, but available for future enhancements)
+ * @param horizonMonths - Time horizon in months (default: 3)
+ * @returns Scenario summary with bull/base/bear projections and point estimate
+ */
 function generateScenarios(
   user: UserProfile,
   stock: StockData,
@@ -240,7 +334,21 @@ function generateScenarios(
   };
 }
 
-// Generate planning guidance
+/**
+ * Generates framework-based planning guidance based on user profile.
+ * 
+ * Provides educational guidance (NOT personalized advice) in three categories:
+ * - **Position Sizing**: Framework-based suggestions based on risk tolerance
+ * - **Timing**: Entry timing considerations based on investment horizon
+ * - **Risk Notes**: Risk considerations based on investment objective
+ * 
+ * All guidance uses framework language ("many investors...", "typically...")
+ * and emphasizes that it's educational, not personalized financial advice.
+ * 
+ * @param user - User profile (risk tolerance, horizon, objective)
+ * @param stock - Stock data (currently not used, but available for future enhancements)
+ * @returns Planning guidance with position sizing, timing, and risk notes
+ */
 function generatePlanningGuidance(
   user: UserProfile,
   stock: StockData
@@ -388,7 +496,38 @@ function generateSummary(
   };
 }
 
-// Main analysis function
+/**
+ * Main analysis function - orchestrates the complete stock analysis pipeline.
+ * 
+ * This is the primary entry point for stock analysis. It:
+ * 1. Validates inputs (user profile and stock data required)
+ * 2. Classifies fundamentals and valuation
+ * 3. Analyzes technical indicators and sentiment
+ * 4. Generates scenario projections
+ * 5. Generates planning guidance
+ * 6. Composes summary and view strings
+ * 7. Returns complete AnalysisResult
+ * 
+ * **Critical Constraints**:
+ * - This function is PURE (no side effects, deterministic)
+ * - All external data must be passed in via `stock` parameter
+ * - No API calls, no database queries, no file I/O
+ * 
+ * @param user - User investment profile (risk tolerance, horizon, objective)
+ * @param stock - Complete stock data (fundamentals, technicals, sentiment)
+ * @param opts - Optional analysis options (e.g., horizonMonths, default: 3)
+ * @returns Complete analysis result with all classifications, scenarios, and guidance
+ * @throws Error if user or stock data is missing
+ * 
+ * @example
+ * ```typescript
+ * const result = analyzeStock(
+ *   { riskTolerance: 'moderate', horizon: '5-10', objective: 'growth' },
+ *   stockData,
+ *   { horizonMonths: 6 }
+ * );
+ * ```
+ */
 export function analyzeStock(
   user: UserProfile,
   stock: StockData,

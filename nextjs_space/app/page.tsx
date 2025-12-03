@@ -42,8 +42,18 @@ export default function Home() {
       setStock(stockData);
       setResult(analysisResult);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err?.message : 'An unexpected error occurred';
-      setError(errorMessage ?? 'Unknown error');
+      const rawMessage = err instanceof Error ? err?.message : 'An unexpected error occurred';
+
+      // Map low-level errors to user-friendly messages where possible
+      if (typeof rawMessage === 'string' && rawMessage.includes('Stock data not found')) {
+        setError(
+          'This ticker is not available in the current demo dataset. Try one of: AAPL, MSFT, TSLA, GOOGL, NVDA.'
+        );
+      } else if (typeof rawMessage === 'string' && rawMessage.includes('Ticker is required')) {
+        setError('Please enter a valid stock ticker to run an analysis.');
+      } else {
+        setError(rawMessage ?? 'An unexpected error occurred while running the analysis.');
+      }
     } finally {
       setIsLoading(false);
     }

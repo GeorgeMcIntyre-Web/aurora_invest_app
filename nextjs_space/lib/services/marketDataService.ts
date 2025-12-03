@@ -21,12 +21,25 @@ export class MockMarketDataService implements MarketDataService {
     const data = getMockStockData(ticker);
     
     if (!data) {
-      throw new Error(`Stock data not found for ticker: ${ticker}. Available tickers: AAPL, MSFT, TSLA, GOOGL, NVDA`);
+      throw new Error(
+        `Stock data not found for ticker: ${ticker}. Available tickers: AAPL, MSFT, TSLA, GOOGL, NVDA`
+      );
     }
 
     return data;
   }
 }
 
-// Default service instance
-export const marketDataService = new MockMarketDataService();
+/**
+ * Factory to create the active MarketDataService.
+ * Currently returns the mock implementation, but is structured so that
+ * a real API-backed service can be swapped in via configuration/env.
+ */
+export function createMarketDataService(): MarketDataService {
+  // In the future, check process.env.NEXT_PUBLIC_DATA_SOURCE or similar
+  // to decide between mock vs. real implementations.
+  return new MockMarketDataService();
+}
+
+// Default service instance used by the app
+export const marketDataService: MarketDataService = createMarketDataService();
