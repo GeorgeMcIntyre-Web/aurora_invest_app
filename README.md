@@ -11,6 +11,7 @@ A production-ready investment analysis tool that provides comprehensive stock an
   - Fundamentals & Valuation (P/E ratios, growth rates, margins)
   - Technical Analysis (trend, momentum, price positioning)
   - Market Sentiment (analyst consensus, price targets, news)
+- **Pluggable Data Providers**: Switch between mock demo data and a live Alpha Vantage integration with retries, timeouts, and graceful fallbacks
 - **3-Month Scenario Engine**: Bull/Base/Bear projections with probabilities
 - **Framework-Based Guidance**: Position sizing, timing, risk considerations
 - **Interactive Visualizations**: Charts for scenarios, fundamentals, technicals
@@ -31,6 +32,10 @@ yarn install
 
 # Run development server
 yarn dev
+
+# or with npm
+npm install
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
@@ -40,7 +45,30 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ```bash
 yarn build
 yarn start
+
+# npm alternative
+npm run build
+npm start
 ```
+
+### Environment Variables
+
+1. Copy the sample file:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Set these keys (all prefixed with `NEXT_PUBLIC` so they can be consumed in the client bundle):
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_MARKET_DATA_PROVIDER` | `demo` | Use `demo` for the bundled mock dataset or `alpha_vantage` for the live API |
+| `NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY` | _(required for live)_ | Your Alpha Vantage API key |
+| `NEXT_PUBLIC_MARKET_DATA_TIMEOUT_MS` | `10000` | Timeout for individual API requests (milliseconds) |
+| `NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES` | `2` | Automatic retries after failures |
+| `NEXT_PUBLIC_MARKET_DATA_BACKOFF_MS` | `500` | Base delay (ms) used for exponential backoff between retries |
+| `NEXT_PUBLIC_ALPHA_VANTAGE_OUTPUT_SIZE` | `compact` | Set to `full` if you need the entire Alpha Vantage time-series history |
+
+`.env.local` is git-ignored. Never commit real API keys.
 
 ## 📊 Available Stocks (Mock Data)
 
@@ -81,7 +109,9 @@ aurora_invest_app/
 │   │   ├── AnalysisTypes.ts        # Core type definitions
 │   │   └── auroraEngine.ts         # Pure analysis engine
 │   ├── services/
-│   │   └── marketDataService.ts    # Data abstraction layer
+│   │   ├── marketDataService.ts    # Data abstraction + provider factory
+│   │   └── implementations/
+│   │       └── AlphaVantageService.ts
 │   └── data/
 │       └── mockData.ts             # Mock stock data
 └── public/
