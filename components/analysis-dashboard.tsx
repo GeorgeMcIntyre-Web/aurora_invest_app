@@ -1,19 +1,36 @@
 'use client';
 
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
-import { AnalysisResult, StockData } from '@/lib/domain/AnalysisTypes';
+import { AnalysisResult, StockData, HistoricalData } from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
 import { ScenarioCards } from './scenario-cards';
 import { ExportButtons } from './export-buttons';
+import { HistoricalChart } from './historical-chart';
+import { HistoricalCard } from './historical-card';
+
+type HistoricalPeriod = HistoricalData['period'];
 
 interface AnalysisDashboardProps {
   result: AnalysisResult;
   stock: StockData;
+  historicalSeries?: Partial<Record<HistoricalPeriod, HistoricalData>>;
+  selectedPeriod?: HistoricalPeriod;
+  onPeriodChange?: (period: HistoricalPeriod) => void;
+  historicalLoading?: boolean;
+  historicalError?: string | null;
 }
 
-export function AnalysisDashboard({ result, stock }: AnalysisDashboardProps) {
+export function AnalysisDashboard({
+  result,
+  stock,
+  historicalSeries,
+  selectedPeriod = '6M',
+  onPeriodChange,
+  historicalLoading = false,
+  historicalError = null,
+}: AnalysisDashboardProps) {
   if (!result) {
     return null;
   }
@@ -21,6 +38,7 @@ export function AnalysisDashboard({ result, stock }: AnalysisDashboardProps) {
   const summary = result?.summary;
   const scenarios = result?.scenarios;
   const planningGuidance = result?.planningGuidance;
+  const historicalDataset = historicalSeries?.[selectedPeriod] ?? null;
 
   return (
     <div className="space-y-8">
@@ -121,6 +139,22 @@ export function AnalysisDashboard({ result, stock }: AnalysisDashboardProps) {
 
       {/* Technical Analysis */}
       <TechnicalsCard stock={stock} technicalView={result?.technicalView ?? ''} />
+
+      {/* Historical Analysis */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <HistoricalChart
+          data={historicalDataset}
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={onPeriodChange}
+          isLoading={historicalLoading}
+          error={historicalError}
+        />
+        <HistoricalCard
+          data={historicalDataset}
+          selectedPeriod={selectedPeriod}
+          isLoading={historicalLoading}
+        />
+      </div>
 
       {/* Market Sentiment */}
       <SentimentCard stock={stock} sentimentView={result?.sentimentView ?? ''} />
