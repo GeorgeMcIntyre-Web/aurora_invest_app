@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
-import { AnalysisResult, StockData, HistoricalData } from '@/lib/domain/AnalysisTypes';
+import { AnalysisResult, StockData, HistoricalData, PortfolioContext } from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
@@ -10,6 +12,10 @@ import { ExportButtons } from './export-buttons';
 import { RiskCard } from './risk-card';
 import { HistoricalChart } from './historical-chart';
 import { HistoricalCard } from './historical-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 type HistoricalPeriod = HistoricalData['period'];
 
@@ -21,6 +27,11 @@ interface AnalysisDashboardProps {
   onPeriodChange?: (period: HistoricalPeriod) => void;
   historicalLoading?: boolean;
   historicalError?: string | null;
+  portfolioContext?: PortfolioContext | null;
+  portfolioLoading?: boolean;
+  portfolioError?: string | null;
+  onQuickAddHolding?: (input: { shares: number; averageCostBasis: number; purchaseDate: string }) => Promise<void>;
+  quickAddBusy?: boolean;
 }
 
 export function AnalysisDashboard({
@@ -31,6 +42,11 @@ export function AnalysisDashboard({
   onPeriodChange,
   historicalLoading = false,
   historicalError = null,
+  portfolioContext,
+  portfolioLoading = false,
+  portfolioError = null,
+  onQuickAddHolding,
+  quickAddBusy = false,
 }: AnalysisDashboardProps) {
   if (!result) {
     return null;
@@ -40,6 +56,36 @@ export function AnalysisDashboard({
   const scenarios = result?.scenarios;
   const planningGuidance = result?.planningGuidance;
   const historicalDataset = historicalSeries?.[selectedPeriod] ?? null;
+  const [quickAddShares, setQuickAddShares] = useState('');
+  const [quickAddCost, setQuickAddCost] = useState('');
+  const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
+  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
+
+  const handleQuickAdd = async () => {
+    if (!onQuickAddHolding) {
+      return;
+    }
+    const shares = Number(quickAddShares);
+    const cost = Number(quickAddCost);
+    if (!shares || !cost) {
+      setQuickAddMessage('Enter a valid share count and cost basis.');
+      return;
+    }
+    setQuickAddMessage(null);
+    try {
+      await onQuickAddHolding({
+        shares,
+        averageCostBasis: cost,
+        purchaseDate: quickAddDate,
+      });
+      setQuickAddShares('');
+      setQuickAddCost('');
+      setQuickAddMessage('Holding added to portfolio.');
+    } catch (error) {
+      console.error(error);
+      setQuickAddMessage('Unable to add holding. Try again from the portfolio page.');
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -130,6 +176,74 @@ export function AnalysisDashboard({
           </ul>
         </div>
       </div>
+
+      {(portfolioLoading || portfolioContext || portfolioError) && (
+        <div className="bg-ai-card border border-gray-700 rounded-lg p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-ai-primary" />
+            <h2 className="text-lg font-semibold text-ai-text">Portfolio Context</h2>
+            <div className="flex-1" />
+            <Link href="/portfolio">
+              <Button variant="outline" size="sm" type="button">
+                View Portfolio
+              </Button>
+            </Link>
+          </div>
+          {portfolioLoading && <p className="text-sm text-ai-muted">Loading portfolio insights...</p>}
+          {portfolioError && <p className="text-sm text-red-400">{portfolioError}</p>}
+          {/* TODO: Portfolio context UI - temporarily disabled until types are aligned */}
+          {portfolioContext && (
+            <div className="space-y-4">
+              <p className="text-sm text-ai-muted">
+                Portfolio integration in progress. Visit the{' '}
+                <a href="/portfolio" className="text-ai-accent hover:underline">portfolio page</a>{' '}
+                to manage holdings.
+              </p>
+              {onQuickAddHolding && (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <div>
+                    <Label htmlFor="quickShares">Shares</Label>
+                    <Input
+                      id="quickShares"
+                      type="number"
+                      min="0"
+                      value={quickAddShares}
+                      onChange={(event) => setQuickAddShares(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="quickCost">Cost Basis ($)</Label>
+                    <Input
+                      id="quickCost"
+                      type="number"
+                      min="0"
+                      value={quickAddCost}
+                      onChange={(event) => setQuickAddCost(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="quickDate">Purchase Date</Label>
+                    <Input
+                      id="quickDate"
+                      type="date"
+                      value={quickAddDate}
+                      onChange={(event) => setQuickAddDate(event.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" onClick={() => void handleQuickAdd()} disabled={quickAddBusy}>
+                      {portfolioContext.existingHolding ? 'Add Lots' : 'Add to Portfolio'}
+                    </Button>
+                  </div>
+                  {quickAddMessage && (
+                    <p className="col-span-full text-sm text-ai-muted">{quickAddMessage}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Risk Insights */}
       <RiskCard result={result} stock={stock} />

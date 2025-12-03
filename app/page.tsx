@@ -1,12 +1,26 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { StockForm } from '@/components/stock-form';
 import { AnalysisDashboard } from '@/components/analysis-dashboard';
-import { UserProfile, AnalysisResult, StockData, HistoricalData } from '@/lib/domain/AnalysisTypes';
+import {
+  UserProfile,
+  AnalysisResult,
+  StockData,
+  HistoricalData,
+  PortfolioContext,
+} from '@/lib/domain/AnalysisTypes';
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
+// Portfolio imports - temporarily disabled until service methods are implemented
+// import {
+//   calculateAllocation,
+//   calculatePortfolioMetrics,
+//   detectConcentrationRisk,
+//   suggestPortfolioAction,
+// } from '@/lib/domain/portfolioEngine';
+// import { portfolioService } from '@/lib/services/portfolioService';
 
 type ErrorCategory = 'network' | 'data' | 'analysis' | 'unknown';
 
@@ -299,6 +313,21 @@ export default function Home() {
   const cachedAnalyses = useRef<Map<string, CachedAnalysisRecord>>(new Map());
   const requestQueue = useRef<AnalysisRequest[]>([]);
   const processingRef = useRef(false);
+  const [portfolioContext, setPortfolioContext] = useState<PortfolioContext | null>(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
+  const [quickAddPending, setQuickAddPending] = useState(false);
+
+  const loadPortfolioContext = useCallback(
+    async (_ticker: string, _fallbackPrice = 0) => {
+      // TODO: Portfolio context integration - needs service methods implemented
+      // const normalizedTicker = normalizeTicker(ticker);
+      setPortfolioContext(null);
+      setPortfolioLoading(false);
+      setPortfolioError(null);
+    },
+    []
+  );
 
   const applyStage = (stage: LoadingStage) => {
     setLoadingStage(stage);
@@ -394,6 +423,7 @@ export default function Home() {
     setIsLoading(false);
     setIsCancellationPending(false);
     resetLoadingTracker();
+    void loadPortfolioContext(entry.stock.ticker, entry.stock.technicals?.price ?? 0);
   };
 
   const runAnalysis = async (request: AnalysisRequest) => {
@@ -440,6 +470,7 @@ export default function Home() {
       setStock(stockData);
       setResult(analysisResult);
       persistToCache(request.cacheKey, { stock: stockData, result: analysisResult });
+      await loadPortfolioContext(request.ticker, stockData?.technicals?.price ?? 0);
     } catch (err) {
       setErrorDetail(buildUserFriendlyError(err));
     } finally {
@@ -490,6 +521,42 @@ export default function Home() {
     }
   };
 
+  const handleQuickAddHolding = useCallback(
+    async ({
+      shares,
+      averageCostBasis,
+      purchaseDate,
+    }: {
+      shares: number;
+      averageCostBasis: number;
+      purchaseDate: string;
+    }) => {
+      if (!portfolioContext || !result?.ticker) {
+        throw new Error('No active analysis to add to the portfolio.');
+      }
+      const ticker = normalizeTicker(result.ticker);
+      setQuickAddPending(true);
+      setPortfolioError(null);
+      try {
+        // TODO: Implement portfolio service addHolding method
+        // await portfolioService.addHolding(portfolioContext.portfolioId, {
+        //   ticker,
+        //   shares,
+        //   averageCostBasis,
+        //   purchaseDate,
+        // });
+        await loadPortfolioContext(ticker, stock?.technicals?.price ?? averageCostBasis);
+      } catch (err) {
+        console.error(err);
+        setPortfolioError('Unable to add holding to portfolio.');
+        throw err;
+      } finally {
+        setQuickAddPending(false);
+      }
+    },
+    [portfolioContext, result?.ticker, stock, loadPortfolioContext]
+  );
+
   const handleAnalyze = async (ticker: string, profile: UserProfile) => {
     if (!ticker || !profile) {
       return;
@@ -498,6 +565,8 @@ export default function Home() {
     const normalizedTicker = normalizeTicker(ticker);
     const cacheKey = buildCacheKey(normalizedTicker, profile);
     const cachedEntry = getCachedEntry(cacheKey);
+    setPortfolioContext(null);
+    setPortfolioError(null);
 
     if (cachedEntry) {
       hydrateFromCache(cachedEntry);
@@ -733,6 +802,11 @@ export default function Home() {
                 onPeriodChange={handleHistoricalPeriodChange}
                 historicalLoading={historicalLoading}
                 historicalError={historicalError}
+                portfolioContext={portfolioContext}
+                portfolioLoading={portfolioLoading}
+                portfolioError={portfolioError}
+                onQuickAddHolding={handleQuickAddHolding}
+                quickAddBusy={quickAddPending}
               />
             )}
           </div>

@@ -1,5 +1,7 @@
 // Core type definitions for AuroraInvest Stock Analyzer
 
+import type { PortfolioAction, PortfolioHolding, PortfolioMetrics } from './portfolioEngine';
+
 export type RiskTolerance = 'low' | 'moderate' | 'high';
 export type InvestmentHorizon = '1-3' | '5-10' | '10+';
 export type InvestmentObjective = 'growth' | 'income' | 'balanced';
@@ -144,4 +146,14 @@ export interface HistoricalData {
   ticker: string;
   period: '1M' | '3M' | '6M' | '1Y' | '5Y';
   dataPoints: HistoricalDataPoint[];
+}
+
+export type PortfolioActionSuggestion = PortfolioAction;
+
+export interface PortfolioContext {
+  portfolioId: string;
+  existingHolding?: PortfolioHolding;
+  portfolioMetrics: PortfolioMetrics;
+  suggestedAction: PortfolioActionSuggestion;
+  reasoning: string[];
 }
