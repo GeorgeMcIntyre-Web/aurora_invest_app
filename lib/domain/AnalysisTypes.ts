@@ -9,6 +9,7 @@ export type ValuationClassification = 'cheap' | 'fair' | 'rich' | 'unknown';
 export type PegBucket = 'discount' | 'balanced' | 'demanding' | 'distorted';
 
 export type GrowthSource = 'eps' | 'revenue';
+export type DividendSustainabilityClassification = 'sustainable' | 'moderate' | 'at_risk';
 
 export interface PegAssessment {
   bucket: PegBucket;
@@ -144,4 +145,19 @@ export interface HistoricalData {
   ticker: string;
   period: '1M' | '3M' | '6M' | '1Y' | '5Y';
   dataPoints: HistoricalDataPoint[];
+}
+
+export interface DividendHistoryEntry {
+  year: number;
+  dividendPerShare: number;
+  earningsPerShare?: number;
+}
+
+export interface DividendSustainabilityResult {
+  coverageRatio: number | null;
+  payoutStdDeviation: number | null;
+  dividendGrowthRate: number | null;
+  sustainabilityScore: number;
+  classification: DividendSustainabilityClassification;
+  notes: string[];
 }
