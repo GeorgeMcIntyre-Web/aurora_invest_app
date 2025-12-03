@@ -8,12 +8,12 @@ Track progress of all 6 Cursor AI agents working on the Aurora Invest App.
 
 | Agent | Task | Status | Branch | PR |
 |-------|------|--------|--------|-----|
-| **Agent 1** | **Enhance valuation logic** | ✅ **COMPLETE** | `feature/agent1-valuation-enhancement` | **Ready to Create** |
-| **Agent 2** | **Integrate financial APIs** | ✅ **COMPLETE** | `feature/agent2-api-integration` | **Ready to Create** |
-| **Agent 3** | **Create UI components** | ✅ **COMPLETE** | `feature/agent3-ui-components` | **Ready to Create** |
-| **Agent 4** | **Request queue & error handling** | ✅ **COMPLETE** | `feature/agent4-request-queue` | **Ready to Create** |
-| **Agent 5** | **Add comprehensive tests** | ✅ **COMPLETE** | `feature/agent5-comprehensive-tests` | **Ready to Create** |
-| **Agent 6** | **Historical analysis & charts** | ✅ **COMPLETE** | `feature/agent6-historical-analysis` | **Ready to Create** |
+| **Agent 1** | **Enhance valuation logic** | ✅ **COMPLETE** | `feature/agent1-valuation-enhancement` | [#8](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/8) ✅ |
+| **Agent 2** | **Integrate financial APIs** | ✅ **COMPLETE** | `feature/agent2-api-integration` | [#9](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/9) ✅ |
+| **Agent 3** | **Create UI components** | ✅ **COMPLETE** | `feature/agent3-ui-components` | [#10](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/10) ✅ |
+| **Agent 4** | **Request queue & error handling** | ✅ **COMPLETE** | `feature/agent4-request-queue` | [#11](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/11) ✅ |
+| **Agent 5** | **Add comprehensive tests** | ✅ **COMPLETE** | `feature/agent5-comprehensive-tests` | [#12](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/12) ✅ |
+| **Agent 6** | **Historical analysis & charts** | ✅ **COMPLETE** | `feature/agent6-historical-analysis` | [#13](https://github.com/GeorgeMcIntyre-Web/aurora_invest_app/pull/13) ✅ |
 
 ---
 
