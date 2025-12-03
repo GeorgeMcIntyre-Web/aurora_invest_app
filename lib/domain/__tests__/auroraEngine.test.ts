@@ -209,6 +209,8 @@ describe('buildValuationInsight', () => {
     expect(insight.classification).toBe('cheap');
     expect(insight.valuationScore).toBeGreaterThanOrEqual(65);
     expect(insight.commentary).toContain('discount');
+    expect(insight.pegAssessment?.bucket).toBe('discount');
+    expect(insight.drivers.some((driver) => driver.includes('PEG'))).toBe(true);
   });
 
   it('detects premium valuations as rich', () => {
@@ -230,6 +232,32 @@ describe('buildValuationInsight', () => {
     expect(insight.classification).toBe('rich');
     expect(insight.valuationScore).toBeLessThan(35);
     expect(insight.commentary).toContain('Premium');
+    expect(insight.pegAssessment?.bucket).toBe('demanding');
+    expect(
+      insight.cautionaryNotes.some((note) => note.includes('premium') || note.includes('PEG'))
+    ).toBe(true);
+  });
+
+  it('marks peg as distorted when growth is negative', () => {
+    const shrinkingStock = createStock({
+      fundamentals: {
+        trailingPE: 28,
+        forwardPE: 26,
+        dividendYieldPct: 0.5,
+        revenueGrowthYoYPct: -4,
+        epsGrowthYoYPct: -6,
+        netMarginPct: 8,
+        freeCashFlowYieldPct: 0.6,
+        debtToEquity: 1.4,
+        roe: 10,
+      },
+    });
+
+    const insight = buildValuationInsight(shrinkingStock);
+    expect(insight.pegAssessment?.bucket).toBe('distorted');
+    expect(
+      insight.cautionaryNotes.some((note) => note.toLowerCase().includes('peg distorted'))
+    ).toBe(true);
   });
 });
 
