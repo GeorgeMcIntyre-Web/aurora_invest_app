@@ -31,6 +31,18 @@ const TEST_USER: UserProfile = {
   objective: 'growth',
 };
 
+const HIGH_RISK_USER: UserProfile = {
+  riskTolerance: 'high',
+  horizon: '1-3',
+  objective: 'growth',
+};
+
+const LOW_RISK_USER: UserProfile = {
+  riskTolerance: 'low',
+  horizon: '10+',
+  objective: 'income',
+};
+
 function createStock(overrides: Partial<StockData>): StockData {
   const fundamentals = overrides.fundamentals ?? {
     trailingPE: 18,
@@ -230,5 +242,41 @@ describe('analyzeStock', () => {
     expect(result.summary.keyTakeaways.some((takeaway) => takeaway.includes('Quality score'))).toBe(
       true
     );
+  });
+});
+
+describe('analyzeStock scenarios and guidance', () => {
+  it('throws when user or stock inputs are missing', () => {
+    expect(() => analyzeStock(undefined as unknown as UserProfile, MOCK_STOCK_DATA.AAPL)).toThrow(
+      'User profile and stock data are required'
+    );
+    expect(() => analyzeStock(TEST_USER, undefined as unknown as StockData)).toThrow(
+      'User profile and stock data are required'
+    );
+  });
+
+  it('honors custom horizons and widens scenario ranges for high risk tolerance', () => {
+    const lowRiskScenarios = analyzeStock(LOW_RISK_USER, MOCK_STOCK_DATA.TSLA, {
+      horizonMonths: 12,
+    }).scenarios;
+    const highRiskScenarios = analyzeStock(HIGH_RISK_USER, MOCK_STOCK_DATA.TSLA, {
+      horizonMonths: 12,
+    }).scenarios;
+
+    expect(lowRiskScenarios.horizonMonths).toBe(12);
+    expect(highRiskScenarios.horizonMonths).toBe(12);
+    expect(highRiskScenarios.bull.expectedReturnPctRange[1]).toBeGreaterThan(
+      lowRiskScenarios.bull.expectedReturnPctRange[1]
+    );
+    expect(highRiskScenarios.bear.expectedReturnPctRange[0]).toBeLessThan(
+      lowRiskScenarios.bear.expectedReturnPctRange[0]
+    );
+  });
+
+  it('returns educational guidance and disclaimers for end users', () => {
+    const result = analyzeStock(TEST_USER, MOCK_STOCK_DATA.NVDA);
+    expect(result.planningGuidance.positionSizing.length).toBeGreaterThan(0);
+    expect(result.summary.keyTakeaways.some((item) => item.includes('Fundamentals'))).toBe(true);
+    expect(result.disclaimer).toContain('educational');
   });
 });
