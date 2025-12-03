@@ -12,6 +12,7 @@ Quick-start prompts for Cursor AI agents. Each prompt is self-contained and incl
 4. [Agent 4: Application Orchestration](#agent-4-application-orchestration)
 5. [Agent 5: Testing & Quality](#agent-5-testing--quality)
 6. [Agent 6: Historical Analysis & Charts](#agent-6-historical-analysis--charts)
+7. [Agent 7: Portfolio Management](#agent-7-portfolio-management)
 
 ---
 
@@ -809,6 +810,715 @@ Tests: [npm test - full output or "N tests passed"]
 3. ✅ Real tests with assertions (no empty scaffolds)
 4. ✅ Build must pass before claiming done
 5. ✅ Provide actual command output (no fabrication)
+
+---
+
+---
+
+## 🤖 Agent 7: Portfolio Management
+
+**Copy this entire prompt to Cursor:**
+
+```
+AGENT 7: Portfolio Management
+
+Your task: Add portfolio tracking and management functionality to Aurora Invest App.
+
+=== PAST FAILURES & HARD CONSTRAINTS ===
+In previous multi-agent runs, the system FAILED in these ways:
+1) Storytelling vs Reality - Agents claimed "300+ tests passing" but real commands didn't support it
+2) Architecture vs Tests Drift - Docs assumed paths that didn't match actual code locations
+3) Fake Progress via Test Scaffolds - Test files existed but Vitest reported "No test suite found"
+4) Branch / Commit Confusion - Alternated between "no implementation" and "all complete" without checking
+5) Over-Scoped Tasks - Tried too much at once, favoring docs over verifiable builds
+6) Premature Tool Blame - Blamed Vitest without minimal reproducible example
+7) MERGE CONFLICTS - Agent 6 initially created conflicts by not rebasing on latest main
+
+=== NON-NEGOTIABLE RULES ===
+1) Ground Truth over Narrative
+   - Before claiming ANYTHING, run actual commands:
+     * git status -sb
+     * git branch -a
+     * git log --oneline -n 5
+     * npm run build
+     * npm test
+   - Do NOT fabricate CLI output
+
+2) Small, Verifiable Milestones
+   - Work in steps with clear "DONE" states:
+     * Step A: npm run build passes with 0 errors
+     * Step B: Minimal test file runs and passes
+     * Step C: Specific test suite passes
+   - Do NOT claim "all tests passing" without listing exact commands run
+
+3) NO CONFLICTS Strategy
+   - ALWAYS start by creating branch from latest main:
+     * git checkout main
+     * git pull origin main
+     * git checkout -b feature/agent7-portfolio-management
+   - Do NOT branch from outdated commits
+
+4) Real Tests, Not Scaffolds
+   - Every test file MUST contain:
+     * At least one describe with at least one it/test block
+     * At least one real assertion (expect(...))
+   - No empty suites that produce "No test suite found"
+
+5) Explicit Reality Snapshots
+   - At checkpoints, provide factual snapshot:
+     * Current branch
+     * Latest commit hash
+     * npm run build result
+     * Specific test command and result
+
+Your goal: Leave repo where npm run build passes, tests execute and pass, NO MERGE CONFLICTS.
+
+=== YOUR CONTEXT ===
+Repository: aurora_invest_app (Next.js 14 + TypeScript stock analysis app)
+Current main commit: 71dee07 (all 6 agents merged + documentation)
+
+Stack:
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS + Radix UI
+- Vitest for testing
+- localStorage for data persistence (Phase 1)
+
+=== YOUR TASK: Portfolio Management ===
+
+Create a portfolio tracking system that allows users to:
+1. Add/remove stock holdings (ticker, shares, cost basis, purchase date)
+2. View portfolio dashboard (total value, daily change, allocation)
+3. See portfolio metrics (beta, volatility, concentration risk)
+4. Analyze stocks in portfolio context (suggested actions: buy/hold/sell)
+
+=== IMPLEMENTATION STEPS ===
+
+STEP 1: Create Branch from Latest Main (CRITICAL!)
+```bash
+git checkout main
+git pull origin main
+git log --oneline -n 1  # Verify you're at 71dee07 or later
+git checkout -b feature/agent7-portfolio-management
+git status -sb
+```
+
+STEP 2: Domain Layer - Portfolio Types & Pure Functions
+File: lib/domain/portfolioEngine.ts (NEW)
+
+```typescript
+/**
+ * Portfolio Management Domain Logic
+ * Pure functions for portfolio calculations and analysis
+ */
+
+export interface PortfolioHolding {
+  ticker: string;
+  shares: number;
+  averageCostBasis: number;
+  purchaseDate: string; // ISO date string
+}
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  holdings: PortfolioHolding[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortfolioMetrics {
+  totalValue: number;
+  totalCost: number;
+  totalGainLoss: number;
+  totalGainLossPct: number;
+  beta: number;
+  volatility: number;
+}
+
+export interface PortfolioAllocation {
+  ticker: string;
+  value: number;
+  weightPct: number;
+  gainLoss: number;
+  gainLossPct: number;
+}
+
+export interface ConcentrationRisk {
+  level: 'low' | 'moderate' | 'high';
+  warnings: string[];
+  largestPositions: { ticker: string; weightPct: number }[];
+}
+
+/**
+ * Calculate portfolio-wide metrics
+ * @param portfolio - The portfolio to analyze
+ * @param currentPrices - Map of ticker to current price
+ * @returns Portfolio metrics including value, gain/loss, beta, volatility
+ */
+export function calculatePortfolioMetrics(
+  portfolio: Portfolio,
+  currentPrices: Map<string, number>,
+  stockBetas?: Map<string, number>
+): PortfolioMetrics {
+  // Implementation: calculate total value, cost, gain/loss, weighted beta
+  // Pure function - no side effects
+}
+
+/**
+ * Calculate position allocations and weights
+ * @param portfolio - The portfolio to analyze
+ * @param currentPrices - Map of ticker to current price
+ * @returns Array of allocations with weights
+ */
+export function calculateAllocation(
+  portfolio: Portfolio,
+  currentPrices: Map<string, number>
+): PortfolioAllocation[] {
+  // Implementation: calculate each position's value and weight
+  // Pure function - no side effects
+}
+
+/**
+ * Detect concentration risk in portfolio
+ * @param allocations - Portfolio allocations
+ * @returns Concentration risk assessment
+ */
+export function detectConcentrationRisk(
+  allocations: PortfolioAllocation[]
+): ConcentrationRisk {
+  // Implementation:
+  // - Flag positions > 25% (high risk)
+  // - Flag positions > 15% (moderate risk)
+  // - Return top 3 largest positions
+  // Pure function - no side effects
+}
+
+/**
+ * Suggest action for stock in portfolio context
+ * @param ticker - Stock ticker
+ * @param portfolio - Current portfolio
+ * @param currentWeight - Current weight of this stock in portfolio
+ * @returns Suggested action with reasoning
+ */
+export function suggestPortfolioAction(
+  ticker: string,
+  portfolio: Portfolio,
+  currentWeight: number
+): { action: 'buy' | 'hold' | 'sell' | 'trim'; reasoning: string[] } {
+  // Implementation: based on position size and concentration
+  // Pure function - no side effects
+}
+```
+
+After creating: Run `npm run build` and fix any TypeScript errors.
+
+STEP 3: Service Layer - Portfolio Persistence
+File: lib/services/portfolioService.ts (NEW)
+
+```typescript
+import { Portfolio, PortfolioHolding } from '../domain/portfolioEngine';
+
+export interface PortfolioService {
+  getPortfolio(id: string): Promise<Portfolio | null>;
+  savePortfolio(portfolio: Portfolio): Promise<void>;
+  getAllPortfolios(): Promise<Portfolio[]>;
+  deletePortfolio(id: string): Promise<void>;
+}
+
+/**
+ * localStorage-based portfolio service
+ * Stores portfolios in browser localStorage
+ */
+export class LocalStoragePortfolioService implements PortfolioService {
+  private readonly STORAGE_KEY = 'aurora_portfolios';
+
+  async getPortfolio(id: string): Promise<Portfolio | null> {
+    const portfolios = this.loadPortfolios();
+    return portfolios.find((p) => p.id === id) || null;
+  }
+
+  async savePortfolio(portfolio: Portfolio): Promise<void> {
+    const portfolios = this.loadPortfolios();
+    const index = portfolios.findIndex((p) => p.id === portfolio.id);
+
+    if (index >= 0) {
+      portfolios[index] = { ...portfolio, updatedAt: new Date().toISOString() };
+    } else {
+      portfolios.push(portfolio);
+    }
+
+    this.storePortfolios(portfolios);
+  }
+
+  async getAllPortfolios(): Promise<Portfolio[]> {
+    return this.loadPortfolios();
+  }
+
+  async deletePortfolio(id: string): Promise<void> {
+    const portfolios = this.loadPortfolios();
+    const filtered = portfolios.filter((p) => p.id !== id);
+    this.storePortfolios(filtered);
+  }
+
+  private loadPortfolios(): Portfolio[] {
+    if (typeof window === 'undefined') return [];
+    const data = localStorage.getItem(this.STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  }
+
+  private storePortfolios(portfolios: Portfolio[]): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(portfolios));
+  }
+}
+
+// Export singleton instance
+export const portfolioService = new LocalStoragePortfolioService();
+```
+
+After creating: Run `npm run build` and fix any TypeScript errors.
+
+STEP 4: UI Components - Portfolio Dashboard
+File: components/portfolio-dashboard.tsx (NEW)
+
+```typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import {
+  Portfolio,
+  PortfolioMetrics,
+  PortfolioAllocation,
+  calculatePortfolioMetrics,
+  calculateAllocation,
+  detectConcentrationRisk
+} from '@/lib/domain/portfolioEngine';
+import { portfolioService } from '@/lib/services/portfolioService';
+
+export function PortfolioDashboard() {
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
+  const [allocations, setAllocations] = useState<PortfolioAllocation[]>([]);
+
+  // Implementation:
+  // - Load portfolio from localStorage
+  // - Fetch current prices for all holdings
+  // - Calculate metrics and allocations
+  // - Display in cards
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Portfolio Overview</CardTitle>
+          <CardDescription>Your holdings and performance</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Display portfolio value, daily change, total gain/loss */}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Holdings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Table of holdings with add/remove actions */}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Risk Metrics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Display beta, volatility, concentration warnings */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+After creating: Run `npm run build` and fix any TypeScript/React errors.
+
+STEP 5: New Page - Portfolio Route
+File: app/portfolio/page.tsx (NEW)
+
+```typescript
+import { PortfolioDashboard } from '@/components/portfolio-dashboard';
+
+export default function PortfolioPage() {
+  return (
+    <main className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">My Portfolio</h1>
+      <PortfolioDashboard />
+    </main>
+  );
+}
+```
+
+After creating: Run `npm run build` and verify route is accessible.
+
+STEP 6: Integration - Add Portfolio Context to Stock Analysis
+File: components/analysis-dashboard.tsx (UPDATE)
+
+Add portfolio context section that shows:
+- If stock is already held in portfolio
+- Current position size and gain/loss
+- Suggested action (buy more, hold, trim)
+
+STEP 7: Tests - Domain Layer
+File: lib/domain/__tests__/portfolioEngine.test.ts (NEW)
+
+```typescript
+import { describe, expect, it } from 'vitest';
+import {
+  calculatePortfolioMetrics,
+  calculateAllocation,
+  detectConcentrationRisk,
+  suggestPortfolioAction,
+  Portfolio,
+  PortfolioHolding,
+} from '../portfolioEngine';
+
+const createPortfolio = (holdings: PortfolioHolding[]): Portfolio => ({
+  id: 'test-portfolio',
+  name: 'Test Portfolio',
+  holdings,
+  createdAt: '2024-01-01',
+  updatedAt: '2024-01-01',
+});
+
+describe('calculatePortfolioMetrics', () => {
+  it('calculates total value and gain/loss correctly', () => {
+    const portfolio = createPortfolio([
+      { ticker: 'AAPL', shares: 10, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+      { ticker: 'MSFT', shares: 5, averageCostBasis: 300, purchaseDate: '2024-01-01' },
+    ]);
+
+    const currentPrices = new Map([
+      ['AAPL', 180],  // +$300 gain
+      ['MSFT', 350],  // +$250 gain
+    ]);
+
+    const metrics = calculatePortfolioMetrics(portfolio, currentPrices);
+
+    expect(metrics.totalValue).toBe(3550);  // 10*180 + 5*350
+    expect(metrics.totalCost).toBe(3000);   // 10*150 + 5*300
+    expect(metrics.totalGainLoss).toBe(550);
+    expect(metrics.totalGainLossPct).toBeCloseTo(18.33, 1);
+  });
+
+  it('handles empty portfolio gracefully', () => {
+    const portfolio = createPortfolio([]);
+    const metrics = calculatePortfolioMetrics(portfolio, new Map());
+
+    expect(metrics.totalValue).toBe(0);
+    expect(metrics.totalCost).toBe(0);
+    expect(metrics.totalGainLoss).toBe(0);
+  });
+});
+
+describe('calculateAllocation', () => {
+  it('computes position weights correctly', () => {
+    const portfolio = createPortfolio([
+      { ticker: 'AAPL', shares: 10, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+      { ticker: 'MSFT', shares: 5, averageCostBasis: 300, purchaseDate: '2024-01-01' },
+    ]);
+
+    const currentPrices = new Map([
+      ['AAPL', 180],
+      ['MSFT', 360],
+    ]);
+
+    const allocations = calculateAllocation(portfolio, currentPrices);
+
+    expect(allocations).toHaveLength(2);
+    expect(allocations[0].ticker).toBe('AAPL');
+    expect(allocations[0].value).toBe(1800);
+    expect(allocations[0].weightPct).toBeCloseTo(50, 1);  // 1800 / 3600
+  });
+
+  it('sums to 100% allocation', () => {
+    const portfolio = createPortfolio([
+      { ticker: 'AAPL', shares: 10, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+      { ticker: 'MSFT', shares: 5, averageCostBasis: 300, purchaseDate: '2024-01-01' },
+      { ticker: 'GOOGL', shares: 8, averageCostBasis: 120, purchaseDate: '2024-01-01' },
+    ]);
+
+    const currentPrices = new Map([
+      ['AAPL', 180],
+      ['MSFT', 360],
+      ['GOOGL', 140],
+    ]);
+
+    const allocations = calculateAllocation(portfolio, currentPrices);
+    const totalWeight = allocations.reduce((sum, a) => sum + a.weightPct, 0);
+
+    expect(totalWeight).toBeCloseTo(100, 1);
+  });
+});
+
+describe('detectConcentrationRisk', () => {
+  it('flags single positions over 25% as high risk', () => {
+    const allocations = [
+      { ticker: 'AAPL', value: 3000, weightPct: 60, gainLoss: 500, gainLossPct: 20 },
+      { ticker: 'MSFT', value: 2000, weightPct: 40, gainLoss: 200, gainLossPct: 11 },
+    ];
+
+    const risk = detectConcentrationRisk(allocations);
+
+    expect(risk.level).toBe('high');
+    expect(risk.warnings.some(w => w.includes('AAPL'))).toBe(true);
+  });
+
+  it('returns low risk for well-diversified portfolio', () => {
+    const allocations = [
+      { ticker: 'AAPL', value: 1000, weightPct: 20, gainLoss: 100, gainLossPct: 11 },
+      { ticker: 'MSFT', value: 1000, weightPct: 20, gainLoss: 100, gainLossPct: 11 },
+      { ticker: 'GOOGL', value: 1000, weightPct: 20, gainLoss: 100, gainLossPct: 11 },
+      { ticker: 'TSLA', value: 1000, weightPct: 20, gainLoss: 100, gainLossPct: 11 },
+      { ticker: 'NVDA', value: 1000, weightPct: 20, gainLoss: 100, gainLossPct: 11 },
+    ];
+
+    const risk = detectConcentrationRisk(allocations);
+
+    expect(risk.level).toBe('low');
+    expect(risk.warnings).toHaveLength(0);
+  });
+});
+
+describe('suggestPortfolioAction', () => {
+  it('suggests trim for oversized positions', () => {
+    const portfolio = createPortfolio([
+      { ticker: 'AAPL', shares: 100, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+    ]);
+
+    const result = suggestPortfolioAction('AAPL', portfolio, 35);
+
+    expect(result.action).toBe('trim');
+    expect(result.reasoning.some(r => r.includes('concentrated'))).toBe(true);
+  });
+
+  it('suggests hold for appropriately sized positions', () => {
+    const portfolio = createPortfolio([
+      { ticker: 'AAPL', shares: 10, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+      { ticker: 'MSFT', shares: 10, averageCostBasis: 300, purchaseDate: '2024-01-01' },
+    ]);
+
+    const result = suggestPortfolioAction('AAPL', portfolio, 18);
+
+    expect(result.action).toBe('hold');
+  });
+});
+```
+
+CRITICAL: After writing tests, run `npm test` and verify ALL tests pass.
+
+STEP 8: Tests - Service Layer
+File: lib/services/__tests__/portfolioService.test.ts (NEW)
+
+```typescript
+import { describe, expect, it, beforeEach } from 'vitest';
+import { LocalStoragePortfolioService } from '../portfolioService';
+import { Portfolio } from '../../domain/portfolioEngine';
+
+// Mock localStorage for Node environment
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
+  };
+})();
+
+global.localStorage = localStorageMock as any;
+
+describe('LocalStoragePortfolioService', () => {
+  let service: LocalStoragePortfolioService;
+
+  beforeEach(() => {
+    localStorageMock.clear();
+    service = new LocalStoragePortfolioService();
+  });
+
+  it('saves and retrieves portfolios', async () => {
+    const portfolio: Portfolio = {
+      id: 'test-1',
+      name: 'My Portfolio',
+      holdings: [
+        { ticker: 'AAPL', shares: 10, averageCostBasis: 150, purchaseDate: '2024-01-01' },
+      ],
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
+
+    await service.savePortfolio(portfolio);
+    const retrieved = await service.getPortfolio('test-1');
+
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.id).toBe('test-1');
+    expect(retrieved?.holdings).toHaveLength(1);
+  });
+
+  it('returns null for non-existent portfolio', async () => {
+    const result = await service.getPortfolio('non-existent');
+    expect(result).toBeNull();
+  });
+
+  it('deletes portfolios', async () => {
+    const portfolio: Portfolio = {
+      id: 'test-2',
+      name: 'Delete Me',
+      holdings: [],
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
+
+    await service.savePortfolio(portfolio);
+    await service.deletePortfolio('test-2');
+
+    const retrieved = await service.getPortfolio('test-2');
+    expect(retrieved).toBeNull();
+  });
+
+  it('lists all portfolios', async () => {
+    const p1: Portfolio = {
+      id: 'test-3',
+      name: 'Portfolio 1',
+      holdings: [],
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
+
+    const p2: Portfolio = {
+      id: 'test-4',
+      name: 'Portfolio 2',
+      holdings: [],
+      createdAt: '2024-01-02',
+      updatedAt: '2024-01-02',
+    };
+
+    await service.savePortfolio(p1);
+    await service.savePortfolio(p2);
+
+    const all = await service.getAllPortfolios();
+    expect(all).toHaveLength(2);
+  });
+});
+```
+
+CRITICAL: After writing tests, run `npm test` and verify ALL tests pass.
+
+STEP 9: Build & Test Verification
+```bash
+# Build must pass with 0 errors
+npm run build
+
+# All tests must pass
+npm test
+
+# Check git status
+git status -sb
+```
+
+STEP 10: Commit & Push
+```bash
+git add .
+git commit -m "feat: add portfolio management system
+
+- Create portfolioEngine.ts with pure domain functions
+- Add LocalStoragePortfolioService for persistence
+- Create portfolio dashboard UI components
+- Add /portfolio route
+- Integrate portfolio context into stock analysis
+- Add 15+ comprehensive tests (domain + service)
+- Build passes with 0 TypeScript errors
+- All tests passing
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+git push origin feature/agent7-portfolio-management
+```
+
+=== COMPLETION CRITERIA ===
+✅ Branch created from latest main (71dee07 or later)
+✅ All new files created:
+   - lib/domain/portfolioEngine.ts
+   - lib/services/portfolioService.ts
+   - lib/domain/__tests__/portfolioEngine.test.ts
+   - lib/services/__tests__/portfolioService.test.ts
+   - components/portfolio-dashboard.tsx
+   - app/portfolio/page.tsx
+✅ npm run build passes with 0 TypeScript errors
+✅ npm test passes with 15+ tests (domain + service)
+✅ All tests have real describe/it/expect blocks (no scaffolds)
+✅ Code committed and pushed to feature branch
+✅ NO MERGE CONFLICTS (verified by starting from latest main)
+
+=== REALITY SNAPSHOT TEMPLATE ===
+When complete, provide:
+
+```
+## Agent 7 Reality Snapshot
+
+**Branch:**
+[output of: git status -sb]
+
+**Latest Commit:**
+[output of: git log --oneline -n 1]
+
+**Build Status:**
+[output of: npm run build]
+
+**Test Status:**
+[output of: npm test]
+
+**Files Created:**
+- lib/domain/portfolioEngine.ts (XXX lines)
+- lib/services/portfolioService.ts (XXX lines)
+- lib/domain/__tests__/portfolioEngine.test.ts (XXX lines)
+- lib/services/__tests__/portfolioService.test.ts (XXX lines)
+- components/portfolio-dashboard.tsx (XXX lines)
+- app/portfolio/page.tsx (XXX lines)
+
+**Test Summary:**
+XX tests passing across 2 test files
+- Domain tests: XX passing
+- Service tests: XX passing
+
+**Verification:**
+✅ Build: PASSING
+✅ Tests: PASSING
+✅ TypeScript: 0 errors
+✅ Branch pushed to origin
+✅ NO MERGE CONFLICTS
+
+Ready for PR creation.
+```
+
+=== CRITICAL REMINDERS ===
+1. ✅ ALWAYS start from latest main to avoid conflicts
+2. ✅ Run npm run build after each major change
+3. ✅ Write real tests with actual expect() assertions
+4. ✅ Provide actual command output (no fabrication)
+5. ✅ Commit frequently with descriptive messages
+6. ✅ Portfolio functions MUST be pure (domain layer)
+7. ✅ Service layer handles persistence (localStorage)
+8. ✅ UI components use 'use client' directive
+9. ✅ Follow existing code patterns and styles
+10. ✅ Test on both domain and service layers
+
+Good luck, Agent 7! Build something amazing! 🚀
+```
 
 ---
 

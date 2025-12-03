@@ -14,6 +14,7 @@ Ultra-fast prompts for Cursor AI. Just copy the prompt for the task you need.
 - **Page Logic** (error handling, loading states) → Use Agent 4
 - **Testing** (add tests, improve coverage) → Use Agent 5
 - **Historical Data** (time-series, charts) → Use Agent 6
+- **Portfolio Management** (track holdings, allocations) → Use Agent 7
 
 ---
 
@@ -111,6 +112,25 @@ Task: Full historical analysis system
 - Run: npm run build && npm run dev (test it!)
 
 Follow all 10 steps in CURSOR_MEGA_PROMPTS.md#agent-6
+Show reality snapshot when done.
+```
+
+### 🤖 Agent 7: Add Portfolio Management
+```
+Agent 7: Add portfolio tracking and management
+
+Read CURSOR_MEGA_PROMPTS.md#agent-7 for full constraints.
+
+Task: Full portfolio management system
+- Create lib/domain/portfolioEngine.ts with pure functions
+- Create lib/services/portfolioService.ts (localStorage)
+- Create components/portfolio-dashboard.tsx
+- Create app/portfolio/page.tsx
+- Write 15+ tests with real assertions
+- Run: npm run build && npm test
+
+CRITICAL: Start from latest main to avoid conflicts!
+Follow all 10 steps in CURSOR_MEGA_PROMPTS.md#agent-7
 Show reality snapshot when done.
 ```
 
