@@ -4,8 +4,16 @@ import {
   buildFundamentalsInsight,
   buildValuationInsight,
   calculateFundamentalsQualityScore,
+  calculateReturns,
+  calculateVolatility,
+  detectTrend,
 } from '../auroraEngine';
-import { StockData, StockFundamentals, UserProfile } from '../AnalysisTypes';
+import {
+  HistoricalData,
+  StockData,
+  StockFundamentals,
+  UserProfile,
+} from '../AnalysisTypes';
 import { MOCK_STOCK_DATA } from '../../data/mockData';
 
 const baseTechnicals = {
@@ -51,6 +59,21 @@ function createStock(overrides: Partial<StockData>): StockData {
     fundamentals,
     technicals: overrides.technicals ?? baseTechnicals,
     sentiment: overrides.sentiment ?? baseSentiment,
+  };
+}
+
+function buildHistoricalData(
+  prices: number[],
+  period: HistoricalData['period'] = '6M'
+): HistoricalData {
+  return {
+    ticker: 'TEST',
+    period,
+    dataPoints: prices.map((price, index) => ({
+      date: new Date(2024, 0, 1 + index).toISOString(),
+      price,
+      volume: 1_000_000 + index * 10_000,
+    })),
   };
 }
 
@@ -218,6 +241,44 @@ describe('buildValuationInsight', () => {
     expect(insight.classification).toBe('rich');
     expect(insight.valuationScore).toBeLessThan(35);
     expect(insight.commentary).toContain('Premium');
+  });
+});
+
+describe('historical analysis helpers', () => {
+  it('calculates period and annualized returns for long periods', () => {
+    const data = buildHistoricalData([100, 110, 120], '1Y');
+    const returns = calculateReturns(data);
+    expect(returns.period).toBeCloseTo(20, 2);
+    expect(returns.annualized).toBeCloseTo(20, 2);
+  });
+
+  it('handles insufficient data when calculating returns', () => {
+    const data = buildHistoricalData([100], '3M');
+    const returns = calculateReturns(data);
+    expect(returns.period).toBe(0);
+    expect(returns.annualized).toBe(0);
+  });
+
+  it('returns zero volatility for flat price action', () => {
+    const data = buildHistoricalData([100, 100, 100, 100], '3M');
+    const volatility = calculateVolatility(data);
+    expect(volatility).toBe(0);
+  });
+
+  it('detects a clear uptrend', () => {
+    const data = buildHistoricalData([100, 104, 108, 115, 123], '6M');
+    expect(detectTrend(data)).toBe('uptrend');
+  });
+
+  it('detects a clear downtrend', () => {
+    const data = buildHistoricalData([150, 140, 132, 125, 118], '6M');
+    expect(detectTrend(data)).toBe('downtrend');
+  });
+
+  it('estimates non-zero volatility for choppy series', () => {
+    const data = buildHistoricalData([100, 103, 99, 104, 101, 106], '3M');
+    const volatility = calculateVolatility(data);
+    expect(volatility).toBeGreaterThan(0);
   });
 });
 
