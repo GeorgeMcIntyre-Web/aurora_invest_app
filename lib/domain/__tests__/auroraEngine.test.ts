@@ -1,0 +1,234 @@
+import { describe, expect, it } from 'vitest';
+import {
+  analyzeStock,
+  buildFundamentalsInsight,
+  buildValuationInsight,
+  calculateFundamentalsQualityScore,
+} from '../auroraEngine';
+import { StockData, StockFundamentals, UserProfile } from '../AnalysisTypes';
+import { MOCK_STOCK_DATA } from '../../data/mockData';
+
+const baseTechnicals = {
+  price: 100,
+  price52wHigh: 120,
+  price52wLow: 80,
+  sma50: 102,
+  sma200: 95,
+  rsi14: 55,
+};
+
+const baseSentiment = {
+  analystConsensus: 'hold' as const,
+  analystTargetMean: 105,
+  analystTargetHigh: 130,
+  analystTargetLow: 80,
+  newsThemes: ['Test item'],
+};
+
+const TEST_USER: UserProfile = {
+  riskTolerance: 'moderate',
+  horizon: '5-10',
+  objective: 'growth',
+};
+
+function createStock(overrides: Partial<StockData>): StockData {
+  const fundamentals = overrides.fundamentals ?? {
+    trailingPE: 18,
+    forwardPE: 16,
+    dividendYieldPct: 1,
+    revenueGrowthYoYPct: 8,
+    epsGrowthYoYPct: 10,
+    netMarginPct: 15,
+    freeCashFlowYieldPct: 3,
+    debtToEquity: 1,
+    roe: 18,
+  };
+
+  return {
+    ticker: 'TEST',
+    name: 'Test Co',
+    currency: 'USD',
+    fundamentals,
+    technicals: overrides.technicals ?? baseTechnicals,
+    sentiment: overrides.sentiment ?? baseSentiment,
+  };
+}
+
+describe('calculateFundamentalsQualityScore', () => {
+  it('returns high score for strong fundamentals', () => {
+    const score = calculateFundamentalsQualityScore(MOCK_STOCK_DATA.MSFT);
+    expect(score).toBeGreaterThanOrEqual(70);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('returns low score for weak fundamentals', () => {
+    const weakStock = createStock({
+      fundamentals: {
+        trailingPE: 60,
+        forwardPE: 55,
+        dividendYieldPct: 0,
+        revenueGrowthYoYPct: -10,
+        epsGrowthYoYPct: -5,
+        netMarginPct: 2,
+        freeCashFlowYieldPct: 0.1,
+        debtToEquity: 3.2,
+        roe: 4,
+      },
+    });
+    const score = calculateFundamentalsQualityScore(weakStock);
+    expect(score).toBeLessThan(30);
+    expect(score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles missing fundamentals by returning zero', () => {
+    const partialStock = createStock({
+      fundamentals: {
+        trailingPE: 22,
+        forwardPE: 20,
+        // intentionally leaving the rest undefined
+      } as StockFundamentals,
+    });
+
+    const score = calculateFundamentalsQualityScore(partialStock);
+    expect(score).toBe(0);
+  });
+});
+
+describe('buildFundamentalsInsight', () => {
+  it('scores high quality companies as strong', () => {
+    const insight = buildFundamentalsInsight(MOCK_STOCK_DATA.MSFT);
+    expect(insight.classification).toBe('strong');
+    expect(insight.qualityScore).toBeGreaterThanOrEqual(60);
+    expect(insight.cautionaryNotes).toHaveLength(0);
+  });
+
+  it('flags weak fundamentals with leverage warnings', () => {
+    const stressedStock = createStock({
+      fundamentals: {
+        trailingPE: 55,
+        forwardPE: 48,
+        dividendYieldPct: 0,
+        revenueGrowthYoYPct: -6,
+        epsGrowthYoYPct: -4,
+        netMarginPct: 4,
+        freeCashFlowYieldPct: 0.2,
+        debtToEquity: 3.5,
+        roe: 5,
+      },
+    });
+
+    const insight = buildFundamentalsInsight(stressedStock);
+    expect(insight.classification).toBe('weak');
+    expect(insight.qualityScore).toBeLessThan(40);
+    expect(insight.cautionaryNotes.some((note) => note.includes('Leverage'))).toBe(true);
+  });
+});
+
+describe('classifyFundamentals thresholds', () => {
+  it('classifies as strong when score is >= 70', () => {
+    const strongStock = createStock({
+      fundamentals: {
+        trailingPE: 20,
+        forwardPE: 18,
+        dividendYieldPct: 1,
+        revenueGrowthYoYPct: 13,
+        epsGrowthYoYPct: 22,
+        netMarginPct: 24,
+        freeCashFlowYieldPct: 6,
+        debtToEquity: 0.7,
+        roe: 28,
+      },
+    });
+    expect(buildFundamentalsInsight(strongStock).classification).toBe('strong');
+  });
+
+  it('classifies as ok when score is between 40 and 69', () => {
+    const midStock = createStock({
+      fundamentals: {
+        trailingPE: 25,
+        forwardPE: 22,
+        dividendYieldPct: 0.8,
+        revenueGrowthYoYPct: 5,
+        epsGrowthYoYPct: 8,
+        netMarginPct: 12,
+        freeCashFlowYieldPct: 3,
+        debtToEquity: 1.2,
+        roe: 16,
+      },
+    });
+    expect(buildFundamentalsInsight(midStock).classification).toBe('ok');
+  });
+
+  it('classifies as weak when score is below 40', () => {
+    const weakStock = createStock({
+      fundamentals: {
+        trailingPE: 60,
+        forwardPE: 55,
+        dividendYieldPct: 0,
+        revenueGrowthYoYPct: -8,
+        epsGrowthYoYPct: -3,
+        netMarginPct: 4,
+        freeCashFlowYieldPct: 0.2,
+        debtToEquity: 3,
+        roe: 6,
+      },
+    });
+    expect(buildFundamentalsInsight(weakStock).classification).toBe('weak');
+  });
+});
+
+describe('buildValuationInsight', () => {
+  it('labels discounted valuations as cheap', () => {
+    const valueStock = createStock({
+      fundamentals: {
+        trailingPE: 14,
+        forwardPE: 12,
+        dividendYieldPct: 2.6,
+        revenueGrowthYoYPct: 11,
+        epsGrowthYoYPct: 18,
+        netMarginPct: 18,
+        freeCashFlowYieldPct: 6,
+        debtToEquity: 0.8,
+        roe: 22,
+      },
+    });
+
+    const insight = buildValuationInsight(valueStock);
+    expect(insight.classification).toBe('cheap');
+    expect(insight.valuationScore).toBeGreaterThanOrEqual(65);
+    expect(insight.commentary).toContain('discount');
+  });
+
+  it('detects premium valuations as rich', () => {
+    const momentumStock = createStock({
+      fundamentals: {
+        trailingPE: 90,
+        forwardPE: 70,
+        dividendYieldPct: 0,
+        revenueGrowthYoYPct: 8,
+        epsGrowthYoYPct: 6,
+        netMarginPct: 10,
+        freeCashFlowYieldPct: 0.3,
+        debtToEquity: 1.2,
+        roe: 12,
+      },
+    });
+
+    const insight = buildValuationInsight(momentumStock);
+    expect(insight.classification).toBe('rich');
+    expect(insight.valuationScore).toBeLessThan(35);
+    expect(insight.commentary).toContain('Premium');
+  });
+});
+
+describe('analyzeStock', () => {
+  it('embeds insight metadata inside the analysis result', () => {
+    const result = analyzeStock(TEST_USER, MOCK_STOCK_DATA.AAPL, { horizonMonths: 6 });
+    expect(result.fundamentalsInsight?.classification).toBeDefined();
+    expect(result.valuationInsight?.classification).toBeDefined();
+    expect(result.fundamentalsView).toContain('Quality Score');
+    expect(result.summary.keyTakeaways.some((takeaway) => takeaway.includes('Quality score'))).toBe(
+      true
+    );
+  });
+});

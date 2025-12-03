@@ -4,6 +4,8 @@ export type RiskTolerance = 'low' | 'moderate' | 'high';
 export type InvestmentHorizon = '1-3' | '5-10' | '10+';
 export type InvestmentObjective = 'growth' | 'income' | 'balanced';
 export type AnalystConsensus = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
+export type FundamentalsClassification = 'strong' | 'ok' | 'weak' | 'unknown';
+export type ValuationClassification = 'cheap' | 'fair' | 'rich' | 'unknown';
 
 export interface UserProfile {
   riskTolerance: RiskTolerance;
@@ -41,6 +43,23 @@ export interface StockSentiment {
   analystTargetHigh?: number;
   analystTargetLow?: number;
   newsThemes: string[];
+}
+
+export interface FundamentalsInsight {
+  classification: FundamentalsClassification;
+  qualityScore: number;
+  drivers: string[];
+  cautionaryNotes: string[];
+}
+
+export interface ValuationInsight {
+  classification: ValuationClassification;
+  valuationScore: number;
+  commentary: string;
+  pegRatio?: number;
+  earningsYieldPct?: number;
+  freeCashFlowYieldPct?: number;
+  dividendYieldPct?: number;
 }
 
 export interface StockData {
@@ -91,6 +110,8 @@ export interface AnalysisResult {
   sentimentView: string;
   scenarios: ScenarioSummary;
   planningGuidance: PlanningGuidance;
+  fundamentalsInsight?: FundamentalsInsight;
+  valuationInsight?: ValuationInsight;
   disclaimer: string;
   generatedAt: string;
 }
