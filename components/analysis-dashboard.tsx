@@ -7,6 +7,7 @@ import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
 import { ScenarioCards } from './scenario-cards';
 import { ExportButtons } from './export-buttons';
+import { RiskCard } from './risk-card';
 
 interface AnalysisDashboardProps {
   result: AnalysisResult;
@@ -111,6 +112,9 @@ export function AnalysisDashboard({ result, stock }: AnalysisDashboardProps) {
           </ul>
         </div>
       </div>
+
+      {/* Risk Insights */}
+      <RiskCard result={result} stock={stock} />
 
       {/* Fundamentals & Valuation */}
       <FundamentalsCard
