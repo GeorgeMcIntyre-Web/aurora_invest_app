@@ -25,6 +25,9 @@ import {
   GrowthSource,
   HistoricalData,
   HistoricalDataPoint,
+  DividendHistoryEntry,
+  DividendSustainabilityResult,
+  DividendSustainabilityClassification,
 } from './AnalysisTypes';
 
 type FundamentalsClass = FundamentalsInsight['classification'];
@@ -641,6 +644,166 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
     dividendYieldPct: dividendYield,
     drivers: driverList,
     cautionaryNotes: cautionList,
+  };
+}
+
+function scoreCoverageRatio(ratio: number | null): number {
+  if (ratio == null) {
+    return 0;
+  }
+
+  if (ratio >= 2) {
+    return 100;
+  }
+
+  if (ratio >= 1) {
+    return Math.round(60 + (ratio - 1) * 40);
+  }
+
+  if (ratio > 0) {
+    return Math.round(Math.max(0, ratio * 60));
+  }
+
+  return 0;
+}
+
+function scorePayoutConsistency(stdDev: number | null, meanDividend: number): number {
+  if (stdDev == null || meanDividend <= 0) {
+    return 0;
+  }
+
+  const coeff = stdDev / Math.max(meanDividend, 0.0001);
+
+  if (coeff <= 0.05) {
+    return 100;
+  }
+
+  if (coeff >= 0.3) {
+    return 0;
+  }
+
+  return Math.round(((0.3 - coeff) / 0.25) * 100);
+}
+
+function scoreDividendGrowth(rate: number | null): number {
+  if (rate == null) {
+    return 0;
+  }
+
+  if (rate >= 8) {
+    return 100;
+  }
+
+  if (rate >= 0) {
+    return Math.round(50 + (rate / 8) * 50);
+  }
+
+  const bounded = Math.max(rate, -30);
+  return Math.max(0, Math.round(50 + (bounded / 30) * 50));
+}
+
+/**
+ * Evaluates dividend sustainability using payout coverage, consistency, and growth.
+ *
+ * @param history Dividend history entries (most recent first or last)
+ * @returns Dividend sustainability metrics and classification
+ */
+export function calculateDividendSustainability(
+  history: DividendHistoryEntry[] | undefined
+): DividendSustainabilityResult {
+  const normalizedHistory = (history ?? [])
+    .filter(
+      (entry) =>
+        entry &&
+        typeof entry.year === 'number' &&
+        typeof entry.dividendPerShare === 'number' &&
+        entry.dividendPerShare >= 0
+    )
+    .sort((a, b) => a.year - b.year)
+    .slice(-5);
+
+  if (!normalizedHistory.length) {
+    return {
+      coverageRatio: null,
+      payoutStdDeviation: null,
+      dividendGrowthRate: null,
+      sustainabilityScore: 0,
+      classification: 'at_risk',
+      notes: ['Dividend history not available'],
+    };
+  }
+
+  const dividends = normalizedHistory.map((entry) => entry.dividendPerShare);
+  const meanDividend = dividends.reduce((sum, value) => sum + value, 0) / dividends.length;
+  const variance =
+    dividends.length > 0
+      ? dividends.reduce((sum, value) => sum + (value - meanDividend) ** 2, 0) / dividends.length
+      : 0;
+  const payoutStdDeviation = Number(Math.sqrt(variance).toFixed(4));
+
+  const coverageEntry = [...normalizedHistory]
+    .reverse()
+    .find((entry) => typeof entry.earningsPerShare === 'number' && entry.dividendPerShare > 0);
+
+  const coverageRatio =
+    coverageEntry && coverageEntry.dividendPerShare > 0
+      ? Number((coverageEntry.earningsPerShare! / coverageEntry.dividendPerShare).toFixed(2))
+      : null;
+
+  const first = normalizedHistory[0];
+  const last = normalizedHistory[normalizedHistory.length - 1];
+  let dividendGrowthRate: number | null = null;
+  if (
+    last.year - first.year > 0 &&
+    first.dividendPerShare > 0 &&
+    last.dividendPerShare > 0
+  ) {
+    const years = last.year - first.year;
+    const cagr = Math.pow(last.dividendPerShare / first.dividendPerShare, 1 / years) - 1;
+    dividendGrowthRate = Number((cagr * 100).toFixed(2));
+  }
+
+  const coverageScore = scoreCoverageRatio(coverageRatio);
+  const consistencyScore = scorePayoutConsistency(payoutStdDeviation, meanDividend);
+  const growthScore = scoreDividendGrowth(dividendGrowthRate);
+
+  const sustainabilityScore = roundScore(
+    coverageScore * 0.45 + consistencyScore * 0.3 + growthScore * 0.25
+  );
+
+  let classification: DividendSustainabilityClassification = 'at_risk';
+  if (sustainabilityScore >= 70) {
+    classification = 'sustainable';
+  } else if (sustainabilityScore >= 40) {
+    classification = 'moderate';
+  }
+
+  const notes: string[] = [];
+  if (coverageRatio == null) {
+    notes.push('Coverage ratio unavailable due to missing earnings/dividends data.');
+  } else if (coverageRatio < 1) {
+    notes.push('Dividends exceed earnings, pressuring sustainability.');
+  }
+
+  if (meanDividend === 0) {
+    notes.push('Dividend payouts were zero during the evaluation window.');
+  } else if (payoutStdDeviation / Math.max(meanDividend, 0.0001) >= 0.25) {
+    notes.push('Dividend volatility exceeds 25% of the mean payout.');
+  }
+
+  if (dividendGrowthRate == null) {
+    notes.push('Dividend growth history insufficient for CAGR calculation.');
+  } else if (dividendGrowthRate < 0) {
+    notes.push('Dividend growth rate is negative over the evaluation window.');
+  }
+
+  return {
+    coverageRatio,
+    payoutStdDeviation,
+    dividendGrowthRate,
+    sustainabilityScore,
+    classification,
+    notes,
   };
 }
 

@@ -3,6 +3,7 @@ import {
   analyzeStock,
   buildFundamentalsInsight,
   buildValuationInsight,
+  calculateDividendSustainability,
   calculateFundamentalsQualityScore,
   calculateReturns,
   calculateVolatility,
@@ -87,6 +88,16 @@ function buildHistoricalData(
       volume: 1_000_000 + index * 25_000,
     })),
   };
+}
+
+function createDividendHistory(
+  entries: Array<{ year: number; dividend: number; earnings?: number }>
+) {
+  return entries.map((entry) => ({
+    year: entry.year,
+    dividendPerShare: entry.dividend,
+    earningsPerShare: entry.earnings,
+  }));
 }
 
 describe('calculateFundamentalsQualityScore', () => {
@@ -281,6 +292,108 @@ describe('buildValuationInsight', () => {
     expect(
       insight.cautionaryNotes.some((note) => note.toLowerCase().includes('peg distorted'))
     ).toBe(true);
+  });
+});
+
+describe('calculateDividendSustainability', () => {
+  it('calculates coverage ratio as earnings divided by dividends for the latest year', () => {
+    const history = createDividendHistory([
+      { year: 2019, dividend: 0.9, earnings: 1.8 },
+      { year: 2020, dividend: 1.0, earnings: 2.2 },
+      { year: 2021, dividend: 1.05, earnings: 2.5 },
+      { year: 2022, dividend: 1.1, earnings: 2.8 },
+      { year: 2023, dividend: 1.15, earnings: 3.4 },
+    ]);
+
+    const result = calculateDividendSustainability(history);
+    expect(result.coverageRatio).toBeCloseTo(2.96, 2);
+  });
+
+  it('calculates payout standard deviation across the last five years', () => {
+    const history = createDividendHistory([
+      { year: 2019, dividend: 1 },
+      { year: 2020, dividend: 1.05 },
+      { year: 2021, dividend: 1.1 },
+      { year: 2022, dividend: 1.15 },
+      { year: 2023, dividend: 1.2 },
+    ]);
+
+    const result = calculateDividendSustainability(history);
+    expect(result.payoutStdDeviation).toBeCloseTo(0.0707, 4);
+  });
+
+  it('computes dividend CAGR between the first and last payouts', () => {
+    const history = createDividendHistory([
+      { year: 2019, dividend: 1 },
+      { year: 2020, dividend: 1.1 },
+      { year: 2021, dividend: 1.21 },
+      { year: 2022, dividend: 1.331 },
+      { year: 2023, dividend: 1.4641 },
+    ]);
+
+    const result = calculateDividendSustainability(history);
+    expect(result.dividendGrowthRate).toBeCloseTo(10, 1);
+  });
+
+  it('applies sustainability classification thresholds', () => {
+    const sustainableResult = calculateDividendSustainability(
+      createDividendHistory([
+        { year: 2019, dividend: 0.8, earnings: 2.1 },
+        { year: 2020, dividend: 0.85, earnings: 2.2 },
+        { year: 2021, dividend: 0.9, earnings: 2.4 },
+        { year: 2022, dividend: 0.95, earnings: 2.6 },
+        { year: 2023, dividend: 1, earnings: 2.8 },
+      ])
+    );
+    expect(sustainableResult.classification).toBe('sustainable');
+    expect(sustainableResult.sustainabilityScore).toBeGreaterThanOrEqual(70);
+
+    const moderateResult = calculateDividendSustainability(
+      createDividendHistory([
+        { year: 2019, dividend: 1.1, earnings: 1.2 },
+        { year: 2020, dividend: 1.5, earnings: 1.3 },
+        { year: 2021, dividend: 0.9, earnings: 1.1 },
+        { year: 2022, dividend: 1.6, earnings: 1.35 },
+        { year: 2023, dividend: 1.25, earnings: 1.4 },
+      ])
+    );
+    expect(moderateResult.classification).toBe('moderate');
+    expect(moderateResult.sustainabilityScore).toBeGreaterThanOrEqual(40);
+    expect(moderateResult.sustainabilityScore).toBeLessThan(70);
+
+    const atRiskResult = calculateDividendSustainability(
+      createDividendHistory([
+        { year: 2019, dividend: 1.5, earnings: 0.2 },
+        { year: 2020, dividend: 1.4, earnings: 0.1 },
+        { year: 2021, dividend: 1.3, earnings: -0.1 },
+        { year: 2022, dividend: 1.2, earnings: -0.3 },
+        { year: 2023, dividend: 1.1, earnings: -0.5 },
+      ])
+    );
+    expect(atRiskResult.classification).toBe('at_risk');
+    expect(atRiskResult.sustainabilityScore).toBeLessThan(40);
+  });
+
+  it('returns at-risk classification when dividend history is missing', () => {
+    const result = calculateDividendSustainability(undefined);
+    expect(result.classification).toBe('at_risk');
+    expect(result.coverageRatio).toBeNull();
+    expect(result.notes).toContain('Dividend history not available');
+  });
+
+  it('penalizes negative earnings within the coverage ratio calculation', () => {
+    const result = calculateDividendSustainability(
+      createDividendHistory([
+        { year: 2019, dividend: 1.5, earnings: 0.2 },
+        { year: 2020, dividend: 1.4, earnings: 0.1 },
+        { year: 2021, dividend: 1.3, earnings: -0.1 },
+        { year: 2022, dividend: 1.2, earnings: -0.3 },
+        { year: 2023, dividend: 1.1, earnings: -0.5 },
+      ])
+    );
+    expect(result.coverageRatio).toBeLessThan(0);
+    expect(result.classification).toBe('at_risk');
+    expect(result.notes.some((note) => note.includes('Dividends exceed earnings'))).toBe(true);
   });
 });
 
