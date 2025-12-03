@@ -20,6 +20,8 @@ import {
   AnalystConsensus,
   FundamentalsInsight,
   ValuationInsight,
+  HistoricalData,
+  HistoricalDataPoint,
 } from './AnalysisTypes';
 
 type FundamentalsClass = FundamentalsInsight['classification'];
@@ -69,6 +71,178 @@ function roundScore(score: number): number {
     return 0;
   }
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+const PERIOD_MONTH_MAP: Record<HistoricalData['period'], number> = {
+  '1M': 1,
+  '3M': 3,
+  '6M': 6,
+  '1Y': 12,
+  '5Y': 60,
+};
+
+const TREND_THRESHOLD_MAP: Record<HistoricalData['period'], number> = {
+  '1M': 3,
+  '3M': 5,
+  '6M': 7,
+  '1Y': 10,
+  '5Y': 15,
+};
+
+const TRADING_DAYS_PER_YEAR = 252;
+
+function normalizeHistoricalPoints(data?: HistoricalData): HistoricalDataPoint[] {
+  if (!data?.dataPoints?.length) {
+    return [];
+  }
+
+  return [...data.dataPoints]
+    .filter((point) => typeof point?.price === 'number' && typeof point?.date === 'string')
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+function calculateSlope(points: HistoricalDataPoint[]): number {
+  if (points.length < 2) {
+    return 0;
+  }
+
+  const n = points.length;
+  const meanX = (n - 1) / 2;
+  const meanY = points.reduce((sum, point) => sum + point.price, 0) / n;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  for (let i = 0; i < n; i += 1) {
+    const x = i - meanX;
+    numerator += x * (points[i].price - meanY);
+    denominator += x * x;
+  }
+
+  if (denominator === 0) {
+    return 0;
+  }
+
+  return numerator / denominator;
+}
+
+/**
+ * Calculates simple and annualized returns for the provided historical series.
+ *
+ * @param data - Historical price series
+ * @returns Period and annualized returns in percentage terms
+ */
+export function calculateReturns(
+  data: HistoricalData
+): { period: number; annualized: number } {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return { period: 0, annualized: 0 };
+  }
+
+  const startPrice = points[0].price;
+  const endPrice = points[points.length - 1].price;
+
+  if (!startPrice || !endPrice || startPrice <= 0 || endPrice <= 0) {
+    return { period: 0, annualized: 0 };
+  }
+
+  const rawReturn = ((endPrice - startPrice) / startPrice) * 100;
+  const months = PERIOD_MONTH_MAP[data?.period ?? '6M'] ?? 6;
+  const years = months / 12;
+  const annualizedReturn =
+    years > 0 ? (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100 : 0;
+
+  return {
+    period: Number(rawReturn.toFixed(2)),
+    annualized: Number(annualizedReturn.toFixed(2)),
+  };
+}
+
+/**
+ * Estimates annualized volatility using daily price changes.
+ *
+ * @param data - Historical price series
+ * @returns Annualized volatility percentage (0-∞)
+ */
+export function calculateVolatility(data: HistoricalData): number {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return 0;
+  }
+
+  const returns: number[] = [];
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1].price;
+    const curr = points[i].price;
+
+    if (!prev || !curr || prev <= 0 || curr <= 0) {
+      continue;
+    }
+
+    returns.push((curr - prev) / prev);
+  }
+
+  if (returns.length === 0) {
+    return 0;
+  }
+
+  const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+  const variance =
+    returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / returns.length;
+
+  const dailyStdDev = Math.sqrt(variance);
+  const annualizedVol = dailyStdDev * Math.sqrt(TRADING_DAYS_PER_YEAR) * 100;
+
+  return Number(annualizedVol.toFixed(2));
+}
+
+/**
+ * Detects overall price trend direction using change percentage, slope, and breadth.
+ *
+ * @param data - Historical price series
+ * @returns Trend direction classification
+ */
+export function detectTrend(
+  data: HistoricalData
+): 'uptrend' | 'downtrend' | 'sideways' {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return 'sideways';
+  }
+
+  const startPrice = points[0].price;
+  const endPrice = points[points.length - 1].price;
+
+  if (!startPrice || !endPrice || startPrice <= 0 || endPrice <= 0) {
+    return 'sideways';
+  }
+
+  const changePct = ((endPrice - startPrice) / startPrice) * 100;
+  const threshold = TREND_THRESHOLD_MAP[data?.period ?? '6M'] ?? 5;
+  const slope = calculateSlope(points);
+
+  let advances = 0;
+  let declines = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    if (points[i].price > points[i - 1].price) {
+      advances += 1;
+    } else if (points[i].price < points[i - 1].price) {
+      declines += 1;
+    }
+  }
+
+  const breadth = advances + declines > 0 ? advances / (advances + declines) : 0.5;
+
+  if (changePct >= threshold && slope > 0 && breadth >= 0.55) {
+    return 'uptrend';
+  }
+
+  if (changePct <= -threshold && slope < 0 && breadth <= 0.45) {
+    return 'downtrend';
+  }
+
+  return 'sideways';
 }
 
 /**
