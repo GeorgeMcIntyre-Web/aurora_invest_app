@@ -1,5 +1,6 @@
 import {
   AnalystConsensus,
+  HistoricalData,
   StockData,
   StockFundamentals,
   StockSentiment,
@@ -16,6 +17,13 @@ const MAX_TIME_SERIES_POINTS = 400;
 const SMA_WINDOWS = [20, 50, 200] as const;
 const RSI_PERIOD = 14;
 const NEWS_THEME_LIMIT = 3;
+const HISTORICAL_PERIOD_DAY_MAP: Record<HistoricalData['period'], number> = {
+  '1M': 21,
+  '3M': 63,
+  '6M': 126,
+  '1Y': 252,
+  '5Y': 252 * 5,
+};
 
 type AlphaVantageOutputSize = 'compact' | 'full';
 
@@ -138,6 +146,33 @@ export class AlphaVantageService implements MarketDataService {
         fundamentals: this.mapFundamentals(overview),
         technicals: this.mapTechnicals(price, normalizedSeries, quote),
         sentiment: this.mapSentiment(price, normalizedSeries, quote),
+      };
+    } catch (error) {
+      throw this.normalizeError(error);
+    }
+  }
+
+  async fetchHistoricalData(
+    rawTicker: string,
+    period: HistoricalData['period']
+  ): Promise<HistoricalData> {
+    const ticker = rawTicker?.trim?.()?.toUpperCase?.();
+    if (!ticker) {
+      throw new Error('Ticker is required');
+    }
+
+    try {
+      const timeSeries = await this.getTimeSeries(ticker);
+      const normalizedSeries = this.normalizeSeries(timeSeries);
+      const dataPoints = this.buildHistoricalDataPoints(normalizedSeries, period);
+      if (!dataPoints.length) {
+        throw new Error(`Alpha Vantage did not return historical prices for ${ticker}.`);
+      }
+
+      return {
+        ticker,
+        period,
+        dataPoints,
       };
     } catch (error) {
       throw this.normalizeError(error);
@@ -376,6 +411,22 @@ export class AlphaVantageService implements MarketDataService {
       analystTargetLow: undefined,
       newsThemes: trendThemes.slice(0, NEWS_THEME_LIMIT),
     };
+  }
+
+  private buildHistoricalDataPoints(
+    series: NormalizedSeriesEntry[],
+    period: HistoricalData['period']
+  ): HistoricalData['dataPoints'] {
+    const limit = HISTORICAL_PERIOD_DAY_MAP[period] ?? 63;
+    return series
+      .slice(0, limit)
+      .map((entry) => ({
+        date: entry.date,
+        price: entry.adjustedClose ?? entry.close ?? entry.high ?? entry.low ?? 0,
+        volume: entry.volume ?? 0,
+      }))
+      .filter((point) => point.price > 0 && Boolean(point.date))
+      .sort((a, b) => (a.date > b.date ? 1 : -1));
   }
 
   private deriveConsensus(
