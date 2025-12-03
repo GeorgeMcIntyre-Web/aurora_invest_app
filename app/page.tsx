@@ -57,6 +57,39 @@ const CANCELLATION_ERROR: UserFriendlyError = {
   suggestion: 'Adjust your inputs and start a new analysis when you are ready.',
 };
 
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_CACHE_ENTRIES = 5;
+
+interface CachedAnalysisRecord {
+  stock: StockData;
+  result: AnalysisResult;
+  cachedAt: number;
+}
+
+const normalizeTicker = (ticker: string) => ticker.trim().toUpperCase();
+
+const buildCacheKey = (ticker: string, profile: UserProfile) => {
+  const normalizedTicker = normalizeTicker(ticker);
+  return `${normalizedTicker}::${profile.riskTolerance}|${profile.horizon}|${profile.objective}`;
+};
+
+const describeCacheAge = (cachedAt: number) => {
+  const elapsedMs = Date.now() - cachedAt;
+
+  if (elapsedMs < 60_000) {
+    const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+    return `${seconds}s`;
+  }
+
+  if (elapsedMs < 3_600_000) {
+    const minutes = Math.floor(elapsedMs / 60_000);
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(elapsedMs / 3_600_000);
+  return `${hours}h`;
+};
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number) => {
@@ -224,7 +257,9 @@ export default function Home() {
   const [loadingStage, setLoadingStage] = useState<LoadingStage>('idle');
   const [progressPercent, setProgressPercent] = useState(0);
   const [isCancellationPending, setIsCancellationPending] = useState(false);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const cancelRequested = useRef(false);
+  const cachedAnalyses = useRef<Map<string, CachedAnalysisRecord>>(new Map());
 
   const applyStage = (stage: LoadingStage) => {
     setLoadingStage(stage);
@@ -236,6 +271,46 @@ export default function Home() {
     setProgressPercent(0);
     setIsCancellationPending(false);
     cancelRequested.current = false;
+  };
+
+  const getCachedEntry = (key: string) => {
+    const entry = cachedAnalyses.current.get(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+      cachedAnalyses.current.delete(key);
+      return null;
+    }
+
+    return entry;
+  };
+
+  const persistToCache = (key: string, payload: { stock: StockData; result: AnalysisResult }) => {
+    cachedAnalyses.current.set(key, {
+      ...payload,
+      cachedAt: Date.now(),
+    });
+
+    if (cachedAnalyses.current.size <= MAX_CACHE_ENTRIES) {
+      return;
+    }
+
+    let oldestKey: string | null = null;
+    let oldestTimestamp = Infinity;
+
+    cachedAnalyses.current.forEach((entry, entryKey) => {
+      if (entry.cachedAt < oldestTimestamp) {
+        oldestTimestamp = entry.cachedAt;
+        oldestKey = entryKey;
+      }
+    });
+
+    if (oldestKey) {
+      cachedAnalyses.current.delete(oldestKey);
+    }
   };
 
   const handleCancelAnalysis = () => {
@@ -252,16 +327,35 @@ export default function Home() {
       return;
     }
 
+    const normalizedTicker = normalizeTicker(ticker);
+    const cacheKey = buildCacheKey(normalizedTicker, profile);
+    const cachedEntry = getCachedEntry(cacheKey);
+
+    if (cachedEntry) {
+      setErrorDetail(null);
+      setResult(cachedEntry.result);
+      setStock(cachedEntry.stock);
+      setCacheNotice(
+        `Loaded from recent analysis cache (${describeCacheAge(cachedEntry.cachedAt)} old).`
+      );
+      resetLoadingTracker();
+      setIsLoading(false);
+      setIsCancellationPending(false);
+      cancelRequested.current = false;
+      return;
+    }
+
     cancelRequested.current = false;
     setIsLoading(true);
     setErrorDetail(null);
     setResult(null);
     setStock(null);
     setIsCancellationPending(false);
+    setCacheNotice(null);
     applyStage('fetching');
 
     try {
-      const stockData = await fetchStockDataWithResilience(ticker, () => cancelRequested.current);
+      const stockData = await fetchStockDataWithResilience(normalizedTicker, () => cancelRequested.current);
 
       if (cancelRequested.current) {
         throw CANCELLATION_ERROR;
@@ -287,6 +381,7 @@ export default function Home() {
 
       setStock(stockData);
       setResult(analysisResult);
+      persistToCache(cacheKey, { stock: stockData, result: analysisResult });
     } catch (err) {
       setErrorDetail(buildUserFriendlyError(err));
     } finally {
@@ -349,6 +444,16 @@ export default function Home() {
 
           {/* Right Panel - Results */}
           <div className="lg:col-span-2">
+            {cacheNotice && result && !isLoading && (
+              <div className="mb-6 rounded-lg border border-ai-primary/40 bg-ai-primary/5 p-4">
+                <p className="text-xs uppercase tracking-wide text-ai-primary">Instant insight</p>
+                <p className="text-sm text-ai-text font-medium mt-1">{cacheNotice}</p>
+                <p className="text-xs text-ai-muted mt-1">
+                  Run a fresh analysis to fetch an updated market snapshot.
+                </p>
+              </div>
+            )}
+
             {!result && !isLoading && (
               <div className="bg-ai-card border border-gray-700 rounded-lg p-12 text-center">
                 <Sparkles className="h-16 w-16 text-ai-muted mx-auto mb-4" />
