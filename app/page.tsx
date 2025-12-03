@@ -57,6 +57,44 @@ const CANCELLATION_ERROR: UserFriendlyError = {
   suggestion: 'Adjust your inputs and start a new analysis when you are ready.',
 };
 
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_CACHE_ENTRIES = 5;
+const MAX_QUEUE_LENGTH = 5;
+
+interface CachedAnalysisRecord {
+  stock: StockData;
+  result: AnalysisResult;
+  cachedAt: number;
+}
+
+interface AnalysisRequest {
+  ticker: string;
+  profile: UserProfile;
+  cacheKey: string;
+  enqueuedAt: number;
+}
+
+const normalizeTicker = (ticker: string) => ticker.trim().toUpperCase();
+
+const buildCacheKey = (ticker: string, profile: UserProfile) => {
+  const normalizedTicker = normalizeTicker(ticker);
+  return `${normalizedTicker}::${profile.riskTolerance}|${profile.horizon}|${profile.objective}`;
+};
+
+const describeCacheAge = (cachedAt: number) => {
+  const elapsedMs = Date.now() - cachedAt;
+
+  if (elapsedMs < 60_000) {
+    return `${Math.max(1, Math.floor(elapsedMs / 1000))}s`;
+  }
+
+  if (elapsedMs < 3_600_000) {
+    return `${Math.floor(elapsedMs / 60_000)}m`;
+  }
+
+  return `${Math.floor(elapsedMs / 3_600_000)}h`;
+};
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number) => {
@@ -224,7 +262,13 @@ export default function Home() {
   const [loadingStage, setLoadingStage] = useState<LoadingStage>('idle');
   const [progressPercent, setProgressPercent] = useState(0);
   const [isCancellationPending, setIsCancellationPending] = useState(false);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
+  const [queuedCount, setQueuedCount] = useState(0);
   const cancelRequested = useRef(false);
+  const cachedAnalyses = useRef<Map<string, CachedAnalysisRecord>>(new Map());
+  const requestQueue = useRef<AnalysisRequest[]>([]);
+  const processingRef = useRef(false);
 
   const applyStage = (stage: LoadingStage) => {
     setLoadingStage(stage);
@@ -238,30 +282,72 @@ export default function Home() {
     cancelRequested.current = false;
   };
 
-  const handleCancelAnalysis = () => {
-    if (!isLoading || cancelRequested.current) {
-      return;
+  const updateQueuedCount = () => setQueuedCount(requestQueue.current.length);
+
+  const getCachedEntry = (key: string) => {
+    const entry = cachedAnalyses.current.get(key);
+
+    if (!entry) {
+      return null;
     }
 
-    cancelRequested.current = true;
-    setIsCancellationPending(true);
+    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+      cachedAnalyses.current.delete(key);
+      return null;
+    }
+
+    return entry;
   };
 
-  const handleAnalyze = async (ticker: string, profile: UserProfile) => {
-    if (!ticker || !profile) {
+  const persistToCache = (key: string, payload: { stock: StockData; result: AnalysisResult }) => {
+    cachedAnalyses.current.set(key, {
+      ...payload,
+      cachedAt: Date.now(),
+    });
+
+    if (cachedAnalyses.current.size <= MAX_CACHE_ENTRIES) {
       return;
     }
 
-    cancelRequested.current = false;
+    let oldestKey: string | null = null;
+    let oldestTimestamp = Infinity;
+
+    cachedAnalyses.current.forEach((entry, entryKey) => {
+      if (entry.cachedAt < oldestTimestamp) {
+        oldestTimestamp = entry.cachedAt;
+        oldestKey = entryKey;
+      }
+    });
+
+    if (oldestKey) {
+      cachedAnalyses.current.delete(oldestKey);
+    }
+  };
+
+  const hydrateFromCache = (entry: CachedAnalysisRecord) => {
+    setErrorDetail(null);
+    setResult(entry.result);
+    setStock(entry.stock);
+    setCacheNotice(
+      `Loaded from recent analysis cache (${describeCacheAge(entry.cachedAt)} old).`
+    );
+    setQueueNotice(null);
+    setIsLoading(false);
+    setIsCancellationPending(false);
+    resetLoadingTracker();
+  };
+
+  const runAnalysis = async (request: AnalysisRequest) => {
     setIsLoading(true);
     setErrorDetail(null);
     setResult(null);
     setStock(null);
     setIsCancellationPending(false);
+    setCacheNotice(null);
     applyStage('fetching');
 
     try {
-      const stockData = await fetchStockDataWithResilience(ticker, () => cancelRequested.current);
+      const stockData = await fetchStockDataWithResilience(request.ticker, () => cancelRequested.current);
 
       if (cancelRequested.current) {
         throw CANCELLATION_ERROR;
@@ -269,7 +355,7 @@ export default function Home() {
 
       applyStage('analyzing');
 
-      const analysisResult = analyzeStock(profile, stockData);
+      const analysisResult = analyzeStock(request.profile, stockData);
 
       if (!analysisResult) {
         throw buildUserFriendlyError(
@@ -287,12 +373,97 @@ export default function Home() {
 
       setStock(stockData);
       setResult(analysisResult);
+      persistToCache(request.cacheKey, { stock: stockData, result: analysisResult });
     } catch (err) {
       setErrorDetail(buildUserFriendlyError(err));
     } finally {
       setIsLoading(false);
       resetLoadingTracker();
     }
+  };
+
+  const executeRequest = (request: AnalysisRequest, originatedFromQueue = false) => {
+    cancelRequested.current = false;
+    processingRef.current = true;
+
+    if (originatedFromQueue) {
+      setQueueNotice(
+        requestQueue.current.length > 0
+          ? `Processing queued analysis for ${request.ticker} (${requestQueue.current.length} waiting).`
+          : `Processing queued analysis for ${request.ticker}...`
+      );
+    } else {
+      setQueueNotice(null);
+    }
+
+    void runAnalysis(request).finally(() => {
+      processingRef.current = false;
+
+      if (requestQueue.current.length > 0) {
+        const nextRequest = requestQueue.current.shift()!;
+        updateQueuedCount();
+        executeRequest(nextRequest, true);
+      } else {
+        setQueueNotice(null);
+      }
+    });
+  };
+
+  const handleCancelAnalysis = () => {
+    if (!isLoading || cancelRequested.current) {
+      return;
+    }
+
+    cancelRequested.current = true;
+    setIsCancellationPending(true);
+
+    if (requestQueue.current.length > 0) {
+      requestQueue.current = [];
+      updateQueuedCount();
+      setQueueNotice('Canceled analysis and cleared queued requests.');
+    }
+  };
+
+  const handleAnalyze = async (ticker: string, profile: UserProfile) => {
+    if (!ticker || !profile) {
+      return;
+    }
+
+    const normalizedTicker = normalizeTicker(ticker);
+    const cacheKey = buildCacheKey(normalizedTicker, profile);
+    const cachedEntry = getCachedEntry(cacheKey);
+
+    if (cachedEntry) {
+      hydrateFromCache(cachedEntry);
+      return;
+    }
+
+    const request: AnalysisRequest = {
+      ticker: normalizedTicker,
+      profile,
+      cacheKey,
+      enqueuedAt: Date.now(),
+    };
+
+    if (processingRef.current) {
+      if (requestQueue.current.length >= MAX_QUEUE_LENGTH) {
+        setErrorDetail({
+          category: 'analysis',
+          message: 'There are already multiple analyses waiting in line.',
+          suggestion: 'Please wait for the current queue to finish before adding new requests.',
+        });
+        return;
+      }
+
+      requestQueue.current.push(request);
+      updateQueuedCount();
+      setQueueNotice(
+        `Queued analysis for ${request.ticker} (position ${requestQueue.current.length}).`
+      );
+      return;
+    }
+
+    executeRequest(request);
   };
 
   const activeStageDetail = LOADING_STAGE_DETAILS[loadingStage];
@@ -349,6 +520,29 @@ export default function Home() {
 
           {/* Right Panel - Results */}
           <div className="lg:col-span-2">
+            {queueNotice && (
+              <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+                <p className="text-xs uppercase tracking-wide text-amber-400">Request queue</p>
+                <p className="text-sm text-ai-text font-medium mt-1">{queueNotice}</p>
+                {queuedCount > 0 && (
+                  <p className="text-xs text-ai-muted mt-1">
+                    {queuedCount} {queuedCount === 1 ? 'analysis remains' : 'analyses remain'} in
+                    the queue.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {cacheNotice && result && !isLoading && (
+              <div className="mb-6 rounded-lg border border-ai-primary/40 bg-ai-primary/5 p-4">
+                <p className="text-xs uppercase tracking-wide text-ai-primary">Instant insight</p>
+                <p className="text-sm text-ai-text font-medium mt-1">{cacheNotice}</p>
+                <p className="text-xs text-ai-muted mt-1">
+                  Run a fresh analysis to fetch an updated market snapshot.
+                </p>
+              </div>
+            )}
+
             {!result && !isLoading && (
               <div className="bg-ai-card border border-gray-700 rounded-lg p-12 text-center">
                 <Sparkles className="h-16 w-16 text-ai-muted mx-auto mb-4" />
@@ -387,6 +581,12 @@ export default function Home() {
                     <p className="text-xs text-ai-muted mt-1">
                       Est. {estimatedSecondsRemaining}s remaining
                     </p>
+                    {queuedCount > 0 && (
+                      <p className="text-xs text-ai-muted mt-1">
+                        {queuedCount} queued {queuedCount === 1 ? 'analysis' : 'analyses'} waiting
+                        patiently.
+                      </p>
+                    )}
                     {isCancellationPending && (
                       <p className="text-xs text-red-400 mt-2">Cancellation requested...</p>
                     )}
