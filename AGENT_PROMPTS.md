@@ -1,571 +1,257 @@
-# 🤖 Agent-Specific Prompts
+# 🤖 Agent Prompts - Copy & Paste
 
-This file contains ready-to-use prompts for different AI agents working on this codebase. Each prompt is tailored for a specific role and includes git setup instructions.
-
----
-
-## 🔧 Setup Instructions (For ALL Agents)
-
-**Before starting work, ensure git remote is configured:**
-
-```bash
-# Navigate to workspace
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Check current remote (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set or incorrect, set it:
-git remote set-url origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Or add if it doesn't exist:
-git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Verify remote is correct
-git remote -v
-
-# Ensure you have latest code
-git fetch origin
-git pull origin main
-```
-
-**Repository Information:**
-- **Workspace Path**: `C:\Users\georgem\source\repos\aurora_invest_app`
-- **Git Remote URL**: `https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git`
-- **Remote Name**: `origin`
-- **Main Branch**: `main` (confirmed)
-- **Documentation**: All agent guides are in the root of the repository
-- **Quick Reference**: See `GIT_SETUP.md` for detailed git commands
+One prompt per agent. Copy the entire prompt for the agent you need.
 
 ---
 
-## 📋 Agent Prompt Templates
-
-### Agent 1: Domain Engine Specialist
+## Agent 1: Domain Engine Specialist
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to enhance the domain analysis engine.
+You are Agent 1: Domain Engine Specialist for Aurora Invest App.
 
-**Context:**
-- This is a Next.js 14 + TypeScript application for educational stock analysis
-- The domain engine is in `lib/domain/auroraEngine.ts` and must remain PURE (no side effects)
-- All types are defined in `lib/domain/AnalysisTypes.ts`
+Study these files first:
+- lib/domain/auroraEngine.ts - Pure functions (no side effects)
+- lib/domain/AnalysisTypes.ts - Type definitions with JSDoc
+- lib/domain/__tests__/auroraEngine.test.ts - Test patterns
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Add ESG score analysis", "Improve valuation classification logic", "Add sector comparison"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. Domain engine functions MUST be pure (no API calls, no side effects, deterministic)
-2. All new types must be added to `AnalysisTypes.ts`
-3. Follow existing function patterns (see JSDoc comments in auroraEngine.ts)
-4. Use framework language only (no personalized financial advice)
+Key patterns to follow:
+- Functions must be pure (deterministic, no side effects)
+- Add types to AnalysisTypes.ts, not inline
+- Use JSDoc comments for documentation
+- All functions must be testable with known inputs/outputs
 
-**Documentation to Read:**
-1. `AGENT_GUIDE.md` → "Task: Modify Analysis Heuristics" or "Task: Add a New Analysis Dimension"
-2. `ARCHITECTURE.md` → "Domain Layer" section
-3. `MODULE_BOUNDARIES.md` → "Domain Layer" boundaries
-4. `CONTRIBUTING.md` → TypeScript guidelines and code patterns
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm run build (should pass)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-```
-
-**Before Submitting:**
-- [ ] All functions are pure (no side effects)
-- [ ] New types added to AnalysisTypes.ts
-- [ ] JSDoc comments added for new functions
-- [ ] No React dependencies in domain layer
-- [ ] Framework language only (no "you should buy/sell")
-
-**Files You'll Work With:**
-- `lib/domain/auroraEngine.ts` - Analysis engine
-- `lib/domain/AnalysisTypes.ts` - Type definitions
-- `lib/data/mockData.ts` - May need to add mock data for new fields
-
-Start by reading the relevant documentation, then implement your changes.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- npm test output
 ```
 
 ---
 
-### Agent 2: UI Component Developer
+## Agent 2: Service Layer & API Integration
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to create or enhance UI components.
+You are Agent 2: Service Layer & API Integration for Aurora Invest App.
 
-**Context:**
-- This is a Next.js 14 + TypeScript + React application
-- UI components are in `components/` directory
-- Uses Tailwind CSS with theme variables (see `app/globals.css`)
-- Uses Lucide React for icons
+Study these files first:
+- lib/services/marketDataService.ts - Service interface pattern
+- lib/services/implementations/DemoMarketDataService.ts - Demo/fallback implementation
+- lib/services/implementations/AlphaVantageService.ts - Real API integration
+- lib/services/__tests__/marketDataService.test.ts - Service testing pattern
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Create ESG score card component", "Improve scenario chart visualization", "Add comparison view"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. Components receive data via props (no direct API calls)
-2. Use theme variables: `bg-ai-card`, `text-ai-text`, `text-ai-muted`, etc.
-3. Handle missing data gracefully (return null or show placeholder)
-4. Follow existing component patterns (see `fundamentals-card.tsx` for reference)
+Key patterns to follow:
+- Define interface in service file, implement in implementations/
+- Keep demo mode working (fallback when no API key)
+- Handle errors gracefully (timeouts, rate limits, invalid responses)
+- Never commit API keys (use .env.local)
 
-**Documentation to Read:**
-1. `AGENT_GUIDE.md` → "Task: Add a New UI Component"
-2. `ARCHITECTURE.md` → "Presentation Layer" section
-3. `MODULE_BOUNDARIES.md` → "Presentation Layer" boundaries
-4. `CONTRIBUTING.md` → "Component Patterns" section
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm run build (should pass)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-```
-
-**Before Submitting:**
-- [ ] Component follows existing patterns
-- [ ] Uses theme variables (no hardcoded colors)
-- [ ] Handles missing data gracefully
-- [ ] TypeScript types properly defined
-- [ ] No direct API calls (data via props only)
-
-**Files You'll Work With:**
-- `components/[your-component].tsx` - Your new/updated component
-- `components/analysis-dashboard.tsx` - May need to integrate your component
-- `app/globals.css` - Theme variables reference
-
-Start by reading the relevant documentation, then implement your changes.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- npm test output
 ```
 
 ---
 
-### Agent 3: API Integration Specialist
+## Agent 3: UI/UX & Components
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to integrate real market data APIs.
+You are Agent 3: UI/UX & Components for Aurora Invest App.
 
-**Context:**
-- Currently uses `MockMarketDataService` for development
-- Service layer is in `lib/services/marketDataService.ts`
-- Must implement `MarketDataService` interface
-- Must map API responses to `StockData` type from `AnalysisTypes.ts`
+Study these files first:
+- components/risk-card.tsx - Card component pattern with data display
+- components/analysis-dashboard.tsx - Dashboard composition with state
+- components/ui/card.tsx - Base Radix UI card component
+- components/ui/button.tsx - Base Radix UI button component
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Integrate Alpha Vantage API", "Add Polygon.io integration", "Implement caching layer"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. All API calls must go through service layer (no direct calls in components)
-2. Map external API responses to `StockData` interface
-3. Handle errors gracefully (rate limits, network failures, invalid tickers)
-4. Never commit API keys (use environment variables)
+Key patterns to follow:
+- Use 'use client' directive for interactive components
+- Follow Radix UI + Tailwind CSS styling patterns
+- Responsive design (mobile-first with md:, lg: breakpoints)
+- Import domain functions, never duplicate logic in components
 
-**Documentation to Read:**
-1. `AGENT_GUIDE.md` → "Task: Integrate a Real Market Data API"
-2. `ARCHITECTURE.md` → "Service Layer" and "Integration Points" sections
-3. `MODULE_BOUNDARIES.md` → "Service Layer" boundaries
-4. `CONTRIBUTING.md` → "Security Guidelines" section
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm run build (should pass)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-```
-
-**Before Submitting:**
-- [ ] Implements `MarketDataService` interface
-- [ ] Maps API response to `StockData` type
-- [ ] Error handling is user-friendly
-- [ ] API keys in environment variables (not hardcoded)
-- [ ] Updated `createMarketDataService()` factory if needed
-- [ ] Documented required environment variables
-
-**Files You'll Work With:**
-- `lib/services/marketDataService.ts` - Service interface and implementations
-- `.env.example` - Document required environment variables
-- `lib/domain/AnalysisTypes.ts` - Type definitions (may need updates)
-
-**Environment Variables:**
-Create `.env.local` (not committed) with:
-```
-ALPHA_VANTAGE_API_KEY=your_key_here
-# or
-POLYGON_API_KEY=your_key_here
-```
-
-Start by reading the relevant documentation, then implement your changes.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- Test in browser at http://localhost:3000
 ```
 
 ---
 
-### Agent 4: Application Orchestrator
+## Agent 4: Application Orchestration
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to enhance the main application flow and orchestration.
+You are Agent 4: Application Orchestration for Aurora Invest App.
 
-**Context:**
-- Main entry point is `app/page.tsx`
-- Orchestrates between form input, data fetching, analysis, and display
-- Manages application-level state (loading, errors, results)
+Study these files first:
+- app/page.tsx - Page-level state management and data fetching
+- components/analysis-dashboard.tsx - Progressive loading states pattern
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Improve error handling", "Add loading states", "Add result caching", "Add multi-stock comparison"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. Orchestrates between layers (doesn't contain business logic)
-2. Calls service layer for data, domain engine for analysis
-3. Maps errors to user-friendly messages
-4. Manages state at application level (not component level)
+Key patterns to follow:
+- Progressive loading states (fetching → analyzing → presenting)
+- User-friendly error messages (not raw error objects)
+- Request queuing to prevent duplicates
+- Caching for performance (store last N results)
+- Retry logic with exponential backoff
 
-**Documentation to Read:**
-1. `AGENT_GUIDE.md` → Relevant task sections
-2. `ARCHITECTURE.md` → "Application Layer" section
-3. `MODULE_BOUNDARIES.md` → "Application Layer" boundaries
-4. `CONTRIBUTING.md` → "Error Handling" section
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm run build (should pass)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-```
-
-**Before Submitting:**
-- [ ] No business logic in application layer
-- [ ] Error messages are user-friendly
-- [ ] Loading states properly managed
-- [ ] Calls service layer (not direct API calls)
-- [ ] Calls domain engine (not inline analysis logic)
-
-**Files You'll Work With:**
-- `app/page.tsx` - Main orchestration
-- `components/stock-form.tsx` - May need updates for new features
-- `components/analysis-dashboard.tsx` - May need updates for new features
-
-Start by reading the relevant documentation, then implement your changes.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- Test in browser at http://localhost:3000
 ```
 
 ---
 
-### Agent 5: Data & Testing Specialist
+## Agent 5: Testing & Quality
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to enhance mock data, add tests, or improve data structures.
+You are Agent 5: Testing & Quality for Aurora Invest App.
 
-**Context:**
-- Mock data is in `lib/data/mockData.ts`
-- Domain types are in `lib/domain/AnalysisTypes.ts`
-- Currently no test suite (you may need to set one up)
+Study these files first:
+- lib/domain/__tests__/auroraEngine.test.ts - Domain test structure with describe/it/expect
+- lib/services/__tests__/marketDataService.test.ts - Service test with mocking
+- vitest.config.ts - Test configuration and setup
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Add more mock stocks", "Add unit tests for domain engine", "Improve data validation", "Add test fixtures"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. Mock data must match `StockData` interface exactly
-2. Tests should be pure and deterministic
-3. Test domain engine functions with known inputs/outputs
-4. Don't modify domain logic (only test it)
+Key patterns to follow:
+- Use `describe` and `it` blocks
+- Have real `expect()` assertions (no scaffolds)
+- Cover edge cases (empty inputs, boundary conditions)
+- Mock side effects like localStorage in service tests
 
-**Documentation to Read:**
-1. `ARCHITECTURE.md` → "Data Layer" section
-2. `MODULE_BOUNDARIES.md` → "Data Layer" boundaries
-3. `CONTRIBUTING.md` → "Testing Guidelines" section
-4. `lib/domain/AnalysisTypes.ts` - Understand data structures
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm test (see current coverage)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-```
-
-**Before Submitting:**
-- [ ] Mock data matches `StockData` interface
-- [ ] Tests are deterministic (no random data)
-- [ ] Test coverage for key functions
-- [ ] Test edge cases (missing data, extreme values)
-
-**Files You'll Work With:**
-- `lib/data/mockData.ts` - Mock data
-- `lib/domain/AnalysisTypes.ts` - Type definitions
-- `lib/domain/auroraEngine.ts` - Functions to test
-- `__tests__/` or `*.test.ts` - Test files (may need to create)
-
-**If Setting Up Tests:**
-Consider using Vitest (lightweight) or Jest:
-```bash
-npm install -D vitest @vitest/ui
-# or
-npm install -D jest @types/jest
-```
-
-Start by reading the relevant documentation, then implement your changes.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- npm test output (FULL test results)
 ```
 
 ---
 
-### Agent 6: Full-Stack Feature Developer
+## Agent 6: Historical Analysis & Charts
 
 ```
-You are working on the AuroraInvest Stock Analyzer codebase. Your role is to implement a complete feature end-to-end.
+You are Agent 6: Historical Analysis & Charts for Aurora Invest App.
 
-**Context:**
-- This requires changes across multiple layers (UI, domain, service, data)
-- You need to coordinate changes across modules
-- Follow the architecture patterns strictly
+Study these files first:
+- lib/domain/auroraEngine.ts - Historical calculation functions (calculateReturns, detectTrend)
+- lib/domain/AnalysisTypes.ts - HistoricalData type definitions
+- components/historical-chart.tsx - Recharts integration pattern
+- components/historical-card.tsx - Historical metrics display
+- lib/services/marketDataService.ts - getHistoricalData method
 
-**Your Task:**
-[SPECIFIC TASK - e.g., "Add portfolio analysis feature", "Add stock comparison view", "Add historical analysis"]
+Your task: [DESCRIBE YOUR TASK HERE]
 
-**Critical Constraints:**
-1. Follow module boundaries (see MODULE_BOUNDARIES.md)
-2. Domain logic stays pure (no side effects)
-3. UI components receive data via props
-4. Service layer handles all external data
-5. Framework language only (no personalized advice)
+Key patterns to follow:
+- Add historical types to AnalysisTypes.ts first
+- Keep domain functions pure (calculateReturns, detectTrend, calculateVolatility)
+- Use Recharts library for time-series visualization
+- Service layer handles data fetching, domain handles calculations
+- Support multiple time periods (1M, 3M, 6M, 1Y, 5Y)
 
-**Documentation to Read:**
-1. `AGENT_INDEX.md` - Start here for navigation
-2. `ARCHITECTURE.md` - Complete system understanding
-3. `MODULE_BOUNDARIES.md` - Understand boundaries
-4. `AGENT_GUIDE.md` - Task-specific instructions
-5. `CONTRIBUTING.md` - Code patterns
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/[your-feature-name]
+3. Run: npm run build (should pass)
 
-**Git Setup:**
-```bash
-cd C:\Users\georgem\source\repos\aurora_invest_app
-
-# Verify remote is set (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If remote is not set, configure it:
-# git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Get latest code
-git fetch origin
-git pull origin main  # or 'master' - check with 'git branch -r'
-
-# Create feature branch
-git checkout -b feature/[your-feature-name]
-```
-
-**Implementation Order:**
-1. Update types in `AnalysisTypes.ts` (if needed)
-2. Add domain logic in `auroraEngine.ts` (if needed)
-3. Update service layer (if needed)
-4. Create/update UI components
-5. Wire everything together in `page.tsx` or `analysis-dashboard.tsx`
-
-**Before Submitting:**
-- [ ] All module boundaries respected
-- [ ] Types defined in AnalysisTypes.ts
-- [ ] Domain engine remains pure
-- [ ] Error handling is user-friendly
-- [ ] UI follows design system
-- [ ] Framework language only
-
-**Files You'll Work With:**
-- Multiple files across layers (see MODULE_BOUNDARIES.md for guidance)
-
-Start by reading AGENT_INDEX.md, then follow the implementation order above.
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- npm test output
+- Browser test at http://localhost:3000
 ```
 
 ---
 
-## 🔄 Multi-Agent Coordination Prompts
-
-### When Multiple Agents Work Together
-
-**Scenario: Adding a New Analysis Dimension**
-
-**Agent A (Domain):**
-```
-You are implementing the domain logic for [NEW DIMENSION]. 
-- Add analysis function to `lib/domain/auroraEngine.ts`
-- Add types to `lib/domain/AnalysisTypes.ts` if needed
-- Coordinate with Agent B on type definitions
-- Wait for Agent B to define types first, then implement
-```
-
-**Agent B (Types):**
-```
-You are defining types for [NEW DIMENSION].
-- Add new fields to `StockData` interface in `lib/domain/AnalysisTypes.ts`
-- Add new fields to `AnalysisResult` interface
-- Export all new types
-- Coordinate with Agent A - define types FIRST before they implement
-```
-
-**Agent C (UI):**
-```
-You are creating the UI component for [NEW DIMENSION].
-- Wait for Agent A and B to complete their work
-- Create `components/[dimension]-card.tsx`
-- Follow patterns from `fundamentals-card.tsx`
-- Integrate into `components/analysis-dashboard.tsx`
-```
-
-**Agent D (Orchestration):**
-```
-You are integrating [NEW DIMENSION] into the main flow.
-- Wait for Agents A, B, C to complete
-- Wire new component into `components/analysis-dashboard.tsx`
-- Ensure data flows correctly from domain → UI
-```
-
----
-
-## 📝 Git Workflow for Agents
-
-### Standard Workflow
-
-```bash
-# 1. Verify remote is set
-cd C:\Users\georgem\source\repos\aurora_invest_app
-git remote -v
-
-# 2. Get latest code
-git fetch origin
-git pull origin main  # or master
-
-# 3. Create feature branch
-git checkout -b feature/[descriptive-name]
-
-# 4. Make your changes
-# ... work on your task ...
-
-# 5. Commit with clear message
-git add .
-git commit -m "feat(scope): description of changes"
-
-# 6. Push to remote
-git push origin feature/[descriptive-name]
-
-# 7. Create pull request (if using GitHub/GitLab)
-```
-
-### Commit Message Format
+## Agent 7: Portfolio Management
 
 ```
-type(scope): short description
+You are Agent 7: Portfolio Management for Aurora Invest App.
 
-Longer description if needed
-```
+Study these files first:
+- lib/domain/auroraEngine.ts - Pure function pattern for portfolio calculations
+- lib/domain/AnalysisTypes.ts - Type definition pattern
+- lib/services/marketDataService.ts - Service interface pattern
+- lib/services/implementations/DemoMarketDataService.ts - localStorage usage example
+- components/risk-card.tsx - Card component pattern
+- components/analysis-dashboard.tsx - Dashboard with state management
+- lib/domain/__tests__/auroraEngine.test.ts - Domain test structure
+- lib/services/__tests__/marketDataService.test.ts - Service test with mocking
 
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `refactor`: Code restructuring
-- `test`: Adding tests
+Your task: Add portfolio tracking and management system
+- Track holdings (ticker, shares, cost basis, purchase date)
+- Calculate portfolio metrics (value, gain/loss, beta, volatility)
+- Display portfolio dashboard with holdings table
+- Show portfolio context when analyzing stocks
+- Detect concentration risk and suggest actions
 
-**Examples:**
-```
-feat(analysis): add ESG score to analysis results
-fix(ui): handle missing technical data gracefully
-docs(agent): add agent guide for new analysis dimensions
+Key patterns to follow:
+- Domain functions must be pure (calculatePortfolioMetrics, calculateAllocation)
+- Service handles localStorage persistence (LocalStoragePortfolioService)
+- UI uses 'use client' and follows existing card patterns
+- Tests must have real assertions, mock localStorage in service tests
+- Start from latest main to avoid merge conflicts
+
+Files to create:
+- lib/domain/portfolioEngine.ts
+- lib/services/portfolioService.ts
+- lib/domain/__tests__/portfolioEngine.test.ts
+- lib/services/__tests__/portfolioService.test.ts
+- components/portfolio-dashboard.tsx
+- app/portfolio/page.tsx
+
+Before you start:
+1. Run: git checkout main && git pull origin main
+2. Create branch: git checkout -b feature/agent7-portfolio-management
+3. Run: npm run build (should pass)
+
+When done, provide reality snapshot:
+- git status -sb
+- git log --oneline -n 1
+- npm run build output
+- npm test output (should show 15+ new tests passing)
+- Browser test at http://localhost:3000/portfolio
 ```
 
 ---
 
-## ✅ Pre-Submit Checklist (All Agents)
-
-Before submitting your work:
-
-- [ ] Git remote is configured correctly (`git remote -v`)
-- [ ] Latest code pulled from remote (`git pull origin main`)
-- [ ] Read relevant documentation (AGENT_INDEX.md → your task)
-- [ ] Followed module boundaries (MODULE_BOUNDARIES.md)
-- [ ] Followed code patterns (CONTRIBUTING.md)
-- [ ] No domain engine side effects (if working on domain)
-- [ ] User-friendly error handling (if applicable)
-- [ ] Framework language only (no personalized advice)
-- [ ] TypeScript types properly defined
-- [ ] No hardcoded secrets (use environment variables)
-
----
-
-## 🆘 Troubleshooting
-
-### Git Remote Issues
-
-```bash
-# Check current remote (should show: https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git)
-git remote -v
-
-# If wrong or missing, set it:
-git remote set-url origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-# or if it doesn't exist:
-git remote add origin https://github.com/GeorgeMcIntyre-Web/aurora_invest_app.git
-
-# Verify
-git remote -v
-git fetch origin
-```
-
-### Can't Find Documentation
-
-All documentation is in the root of the repository:
-- `AGENT_INDEX.md` - Start here (navigation index)
-- `AGENT_GUIDE.md` - Task instructions and mega prompts
-- `AGENT_PROMPTS.md` - Role-specific prompts (this file)
-- `ARCHITECTURE.md` - System design and architecture
-- `MODULE_BOUNDARIES.md` - Module boundaries and dependencies
-- `CONTRIBUTING.md` - Code patterns and conventions
-- `GIT_SETUP.md` - Git remote configuration
-- `VERIFICATION_CHECKLIST.md` - Documentation verification
-- `README.md` - Project overview
-
-### Need Help Understanding Code
-
-1. Read `ARCHITECTURE.md` for system overview
-2. Read `MODULE_BOUNDARIES.md` for module structure
-3. Check JSDoc comments in `lib/domain/auroraEngine.ts`
-4. Review existing similar code in the codebase
-
----
-
-**Last Updated**: 2024
-**Maintained By**: AuroraInvest Team
-
+**Last Updated**: 2025-12-03
