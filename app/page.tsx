@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { StockForm } from '@/components/stock-form';
 import { AnalysisDashboard } from '@/components/analysis-dashboard';
@@ -8,56 +8,299 @@ import { UserProfile, AnalysisResult, StockData } from '@/lib/domain/AnalysisTyp
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
 
+type ErrorCategory = 'network' | 'data' | 'analysis' | 'unknown';
+
+interface UserFriendlyError {
+  category: ErrorCategory;
+  message: string;
+  suggestion: string;
+}
+
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_RETRIES = 2;
+const BASE_BACKOFF_MS = 500;
+const DEMO_TICKERS = ['AAPL', 'MSFT', 'TSLA', 'GOOGL', 'NVDA'];
+
+type LoadingStage = 'idle' | 'fetching' | 'analyzing' | 'presenting';
+
+const LOADING_STAGE_DETAILS: Record<
+  LoadingStage,
+  { label: string; helper: string; progress: number }
+> = {
+  idle: {
+    label: 'Ready to analyze',
+    helper: 'Awaiting ticker and profile information.',
+    progress: 0,
+  },
+  fetching: {
+    label: 'Fetching stock data...',
+    helper: 'Contacting the data provider and retrieving the latest snapshot.',
+    progress: 30,
+  },
+  analyzing: {
+    label: 'Analyzing fundamentals...',
+    helper: 'Running the Aurora engine across fundamentals, technicals, and sentiment.',
+    progress: 65,
+  },
+  presenting: {
+    label: 'Generating insights...',
+    helper: 'Preparing dashboard cards, scenarios, and recommendations.',
+    progress: 90,
+  },
+};
+
+const LOADING_SEQUENCE: LoadingStage[] = ['fetching', 'analyzing', 'presenting'];
+
+const CANCELLATION_ERROR: UserFriendlyError = {
+  category: 'unknown',
+  message: 'Analysis canceled before completion.',
+  suggestion: 'Adjust your inputs and start a new analysis when you are ready.',
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
+const buildUserFriendlyError = (
+  error: unknown,
+  fallbackCategory: ErrorCategory = 'unknown'
+): UserFriendlyError => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'category' in error &&
+    'message' in error &&
+    'suggestion' in error
+  ) {
+    return error as UserFriendlyError;
+  }
+
+  const rawMessage = error instanceof Error ? error.message : '';
+  const normalized = rawMessage.toLowerCase();
+
+  if (normalized.includes('demo dataset') || normalized.includes('available tickers')) {
+    return {
+      category: 'data',
+      message: 'This ticker is not available in the demo dataset.',
+      suggestion: `Try one of: ${DEMO_TICKERS.join(', ')}.`,
+    };
+  }
+
+  if (normalized.includes('ticker is required')) {
+    return {
+      category: 'data',
+      message: 'Please enter a valid stock ticker to run an analysis.',
+      suggestion: 'Provide a ticker (e.g., AAPL) and resubmit the form.',
+    };
+  }
+
+  if (normalized.includes('not found')) {
+    return {
+      category: 'data',
+      message: 'We could not find stock data for that ticker.',
+      suggestion: `Try one of: ${DEMO_TICKERS.join(', ')}.`,
+    };
+  }
+
+  if (normalized.includes('timeout')) {
+    return {
+      category: 'network',
+      message: 'The data request timed out before completing.',
+      suggestion: 'Check your connection and try again in a few seconds.',
+    };
+  }
+
+  if (normalized.includes('network') || normalized.includes('fetch failed')) {
+    return {
+      category: 'network',
+      message: 'We could not reach the data provider.',
+      suggestion: 'Check your internet connection or VPN/firewall settings and try again.',
+    };
+  }
+
+  if (normalized.includes('analysis')) {
+    return {
+      category: 'analysis',
+      message: 'We were unable to complete the analysis.',
+      suggestion: 'Please try again in a moment. If the issue persists, contact support.',
+    };
+  }
+
+  const fallbackMessages: Record<ErrorCategory, UserFriendlyError> = {
+    network: {
+      category: 'network',
+      message: 'We could not reach the data provider.',
+      suggestion: 'Check your connection and try again.',
+    },
+    data: {
+      category: 'data',
+      message: 'We were unable to process that ticker.',
+      suggestion: `Verify the ticker symbol or try one of: ${DEMO_TICKERS.join(', ')}.`,
+    },
+    analysis: {
+      category: 'analysis',
+      message: 'We were unable to complete the analysis.',
+      suggestion: 'Please retry in a moment or adjust your input.',
+    },
+    unknown: {
+      category: 'unknown',
+      message: rawMessage || 'An unexpected error occurred while running the analysis.',
+      suggestion: 'Please try again. If it keeps failing, reach out to support.',
+    },
+  };
+
+  return fallbackMessages[fallbackCategory];
+};
+
+const fetchStockDataWithResilience = async (
+  ticker: string,
+  shouldAbort?: () => boolean
+): Promise<StockData> => {
+  let attempt = 0;
+  let lastError: unknown = null;
+
+  while (attempt <= MAX_RETRIES) {
+    if (shouldAbort?.()) {
+      throw CANCELLATION_ERROR;
+    }
+
+    try {
+      if (!marketDataService?.fetchStockData) {
+        throw new Error('Market data service is unavailable.');
+      }
+
+      const data = await withTimeout(
+        marketDataService.fetchStockData(ticker),
+        FETCH_TIMEOUT_MS
+      );
+
+      if (!data) {
+        throw new Error('Stock data not returned by provider.');
+      }
+
+      return data;
+    } catch (err) {
+      lastError = err;
+
+      if (attempt === MAX_RETRIES || shouldAbort?.()) {
+        break;
+      }
+
+      const backoff = BASE_BACKOFF_MS * Math.pow(2, attempt);
+      await wait(backoff);
+    }
+
+    attempt += 1;
+  }
+
+  if (shouldAbort?.()) {
+    throw CANCELLATION_ERROR;
+  }
+
+  const friendly = buildUserFriendlyError(lastError, 'network');
+  throw friendly;
+};
+
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<UserFriendlyError | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [stock, setStock] = useState<StockData | null>(null);
+  const [loadingStage, setLoadingStage] = useState<LoadingStage>('idle');
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [isCancellationPending, setIsCancellationPending] = useState(false);
+  const cancelRequested = useRef(false);
+
+  const applyStage = (stage: LoadingStage) => {
+    setLoadingStage(stage);
+    setProgressPercent(LOADING_STAGE_DETAILS[stage].progress);
+  };
+
+  const resetLoadingTracker = () => {
+    setLoadingStage('idle');
+    setProgressPercent(0);
+    setIsCancellationPending(false);
+    cancelRequested.current = false;
+  };
+
+  const handleCancelAnalysis = () => {
+    if (!isLoading || cancelRequested.current) {
+      return;
+    }
+
+    cancelRequested.current = true;
+    setIsCancellationPending(true);
+  };
 
   const handleAnalyze = async (ticker: string, profile: UserProfile) => {
     if (!ticker || !profile) {
       return;
     }
 
+    cancelRequested.current = false;
     setIsLoading(true);
-    setError(null);
+    setErrorDetail(null);
     setResult(null);
     setStock(null);
+    setIsCancellationPending(false);
+    applyStage('fetching');
 
     try {
-      // Fetch stock data
-      const stockData = await marketDataService?.fetchStockData?.(ticker);
-      
-      if (!stockData) {
-        throw new Error('Failed to fetch stock data');
+      const stockData = await fetchStockDataWithResilience(ticker, () => cancelRequested.current);
+
+      if (cancelRequested.current) {
+        throw CANCELLATION_ERROR;
       }
 
-      // Analyze
+      applyStage('analyzing');
+
       const analysisResult = analyzeStock(profile, stockData);
-      
+
       if (!analysisResult) {
-        throw new Error('Analysis failed');
+        throw buildUserFriendlyError(
+          new Error('Analysis result is empty'),
+          'analysis'
+        );
       }
+
+      if (cancelRequested.current) {
+        throw CANCELLATION_ERROR;
+      }
+
+      applyStage('presenting');
+      setProgressPercent(100);
 
       setStock(stockData);
       setResult(analysisResult);
     } catch (err) {
-      const rawMessage = err instanceof Error ? err?.message : 'An unexpected error occurred';
-
-      // Map low-level errors to user-friendly messages where possible
-      if (typeof rawMessage === 'string' && rawMessage.includes('Stock data not found')) {
-        setError(
-          'This ticker is not available in the current demo dataset. Try one of: AAPL, MSFT, TSLA, GOOGL, NVDA.'
-        );
-      } else if (typeof rawMessage === 'string' && rawMessage.includes('Ticker is required')) {
-        setError('Please enter a valid stock ticker to run an analysis.');
-      } else {
-        setError(rawMessage ?? 'An unexpected error occurred while running the analysis.');
-      }
+      setErrorDetail(buildUserFriendlyError(err));
     } finally {
       setIsLoading(false);
+      resetLoadingTracker();
     }
   };
+
+  const activeStageDetail = LOADING_STAGE_DETAILS[loadingStage];
+  const currentStageIndex = Math.max(LOADING_SEQUENCE.indexOf(loadingStage), 0);
+  const estimatedSecondsRemaining = Math.max(
+    2,
+    Math.round(Math.max(100 - progressPercent, 5) / 12)
+  );
 
   return (
     <div className="min-h-screen bg-ai-bg">
@@ -85,9 +328,20 @@ export default function Home() {
               <StockForm onAnalyze={handleAnalyze} isLoading={isLoading} />
 
               {/* Error Display */}
-              {error && (
+              {errorDetail && (
                 <div className="mt-6 bg-red-900/20 border border-red-700 rounded-lg p-4">
-                  <p className="text-sm text-red-300">{error}</p>
+                  <p className="text-xs uppercase tracking-wide text-red-400">
+                    {errorDetail.category === 'network' && 'Network issue'}
+                    {errorDetail.category === 'data' && 'Data issue'}
+                    {errorDetail.category === 'analysis' && 'Analysis issue'}
+                    {errorDetail.category === 'unknown' && 'Unexpected issue'}
+                  </p>
+                  <p className="text-sm text-red-300 font-medium mt-1">
+                    {errorDetail.message}
+                  </p>
+                  <p className="text-xs text-ai-muted mt-2">
+                    {errorDetail.suggestion}
+                  </p>
                 </div>
               )}
             </div>
@@ -109,10 +363,97 @@ export default function Home() {
             )}
 
             {isLoading && (
-              <div className="bg-ai-card border border-gray-700 rounded-lg p-12 text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-ai-primary mx-auto mb-4"></div>
-                <h2 className="text-xl font-semibold text-ai-text mb-2">Analyzing...</h2>
-                <p className="text-ai-muted">Processing stock data and generating insights</p>
+              <div className="bg-ai-card border border-gray-700 rounded-lg p-8 lg:p-10">
+                <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-start md:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 rounded-full border-2 border-ai-primary/30 flex items-center justify-center">
+                      <div className="h-6 w-6 rounded-full border-b-2 border-ai-primary animate-spin" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs uppercase tracking-wide text-ai-muted">
+                        Analysis progress
+                      </p>
+                      <h2 className="text-xl font-semibold text-ai-text mt-1">
+                        {activeStageDetail.label}
+                      </h2>
+                      <p className="text-sm text-ai-muted">{activeStageDetail.helper}</p>
+                    </div>
+                  </div>
+                  <div className="text-left md:text-right">
+                    <p className="text-sm text-ai-muted">
+                      Stage {Math.min(currentStageIndex + 1, LOADING_SEQUENCE.length)} of{' '}
+                      {LOADING_SEQUENCE.length}
+                    </p>
+                    <p className="text-xs text-ai-muted mt-1">
+                      Est. {estimatedSecondsRemaining}s remaining
+                    </p>
+                    {isCancellationPending && (
+                      <p className="text-xs text-red-400 mt-2">Cancellation requested...</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <div className="flex items-center justify-between text-sm text-ai-muted">
+                    <span>{Math.min(progressPercent, 100)}% complete</span>
+                    <span>{activeStageDetail.label}</span>
+                  </div>
+                  <div className="h-2 bg-gray-800 rounded-full mt-3">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        isCancellationPending ? 'bg-red-500' : 'bg-ai-primary'
+                      }`}
+                      style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  {LOADING_SEQUENCE.map((stage, index) => {
+                    const stageStatus =
+                      currentStageIndex > index
+                        ? 'done'
+                        : currentStageIndex === index
+                        ? 'active'
+                        : 'pending';
+                    const detail = LOADING_STAGE_DETAILS[stage];
+
+                    return (
+                      <div key={stage} className="flex gap-3 text-left">
+                        <div
+                          className={`mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center text-[11px] font-semibold ${
+                            stageStatus === 'done'
+                              ? 'bg-ai-primary border-ai-primary text-ai-card'
+                              : stageStatus === 'active'
+                              ? 'border-ai-primary text-ai-primary'
+                              : 'border-gray-600 text-gray-500'
+                          }`}
+                        >
+                          {stageStatus === 'done' ? '✓' : index + 1}
+                        </div>
+                        <div>
+                          <p
+                            className={`text-sm font-medium ${
+                              stageStatus === 'pending' ? 'text-ai-muted' : 'text-ai-text'
+                            }`}
+                          >
+                            {detail.label}
+                          </p>
+                          <p className="text-xs text-ai-muted">{detail.helper}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCancelAnalysis}
+                  disabled={!isLoading || isCancellationPending}
+                  className="w-full rounded-lg border border-gray-600 px-4 py-3 text-sm font-medium text-ai-text transition hover:border-ai-primary hover:text-ai-primary disabled:cursor-not-allowed disabled:text-gray-500"
+                >
+                  {isCancellationPending ? 'Canceling analysis...' : 'Cancel analysis'}
+                </button>
               </div>
             )}
 
