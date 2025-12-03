@@ -41,7 +41,7 @@ import {
  * // Returns: 'strong'
  * ```
  */
-function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unknown' {
+export function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unknown' {
   const f = stock?.fundamentals;
   if (!f) {
     return 'unknown';
@@ -78,7 +78,7 @@ function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unk
  * @param stock - Stock data containing fundamentals
  * @returns Classification string indicating valuation level
  */
-function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unknown' {
+export function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unknown' {
   const f = stock?.fundamentals;
   if (!f) {
     return 'unknown';
