@@ -6,6 +6,17 @@ export type InvestmentObjective = 'growth' | 'income' | 'balanced';
 export type AnalystConsensus = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
 export type FundamentalsClassification = 'strong' | 'ok' | 'weak' | 'unknown';
 export type ValuationClassification = 'cheap' | 'fair' | 'rich' | 'unknown';
+export type PegBucket = 'discount' | 'balanced' | 'demanding' | 'distorted';
+
+export type GrowthSource = 'eps' | 'revenue';
+
+export interface PegAssessment {
+  bucket: PegBucket;
+  ratio?: number;
+  normalizedGrowthPct?: number;
+  growthSource?: GrowthSource;
+  commentary: string;
+}
 
 export interface UserProfile {
   riskTolerance: RiskTolerance;
@@ -56,7 +67,10 @@ export interface ValuationInsight {
   classification: ValuationClassification;
   valuationScore: number;
   commentary: string;
+  drivers: string[];
+  cautionaryNotes: string[];
   pegRatio?: number;
+  pegAssessment?: PegAssessment;
   earningsYieldPct?: number;
   freeCashFlowYieldPct?: number;
   dividendYieldPct?: number;

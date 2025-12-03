@@ -20,6 +20,9 @@ import {
   AnalystConsensus,
   FundamentalsInsight,
   ValuationInsight,
+  PegAssessment,
+  PegBucket,
+  GrowthSource,
 } from './AnalysisTypes';
 
 type FundamentalsClass = FundamentalsInsight['classification'];
@@ -36,6 +39,8 @@ const DEFAULT_VALUATION_INSIGHT: ValuationInsight = {
   classification: 'unknown',
   valuationScore: 0,
   commentary: 'Valuation data not available.',
+  drivers: [],
+  cautionaryNotes: [],
 };
 
 function scorePositiveMetric(value: number | undefined, strong: number, weak: number): number {
@@ -69,6 +74,106 @@ function roundScore(score: number): number {
     return 0;
   }
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function dedupe<T>(items: T[]): T[] {
+  return Array.from(new Set(items));
+}
+
+const PEG_BUCKET_SCORES: Record<PegBucket, number> = {
+  discount: 1,
+  balanced: 0.7,
+  demanding: 0.25,
+  distorted: 0.45,
+};
+
+const GROWTH_SOURCE_TEXT: Record<GrowthSource, string> = {
+  eps: 'EPS growth',
+  revenue: 'revenue growth',
+};
+
+type GrowthMetricSelection = {
+  value: number;
+  source: GrowthSource;
+};
+
+function selectGrowthMetric(
+  fundamentals?: StockData['fundamentals']
+): GrowthMetricSelection | undefined {
+  if (!fundamentals) {
+    return undefined;
+  }
+
+  if (typeof fundamentals.epsGrowthYoYPct === 'number') {
+    return { value: fundamentals.epsGrowthYoYPct, source: 'eps' };
+  }
+
+  if (typeof fundamentals.revenueGrowthYoYPct === 'number') {
+    return { value: fundamentals.revenueGrowthYoYPct, source: 'revenue' };
+  }
+
+  return undefined;
+}
+
+function evaluatePegRatio(fundamentals?: StockData['fundamentals']): PegAssessment | undefined {
+  if (!fundamentals) {
+    return undefined;
+  }
+
+  const growthMetric = selectGrowthMetric(fundamentals);
+  if (!growthMetric) {
+    return undefined;
+  }
+
+  const { value: growth, source } = growthMetric;
+  const pe = fundamentals.forwardPE ?? fundamentals.trailingPE;
+
+  if (growth <= 0) {
+    return {
+      bucket: 'distorted',
+      normalizedGrowthPct: growth,
+      growthSource: source,
+      commentary: `${GROWTH_SOURCE_TEXT[source]} turned negative, so PEG loses meaning.`,
+    };
+  }
+
+  if (growth < 5) {
+    return {
+      bucket: 'distorted',
+      ratio: pe && growth > 0 ? pe / Math.max(growth, 0.1) : undefined,
+      normalizedGrowthPct: growth,
+      growthSource: source,
+      commentary: `${GROWTH_SOURCE_TEXT[source]} below 5% makes PEG less reliable.`,
+    };
+  }
+
+  if (!pe) {
+    return undefined;
+  }
+
+  const ratio = pe / growth;
+
+  let bucket: PegBucket = 'balanced';
+  let commentary = 'PEG indicates valuation is broadly aligned with growth.';
+
+  if (ratio <= 1) {
+    bucket = 'discount';
+    commentary = 'PEG below 1 suggests valuation is discounting future growth.';
+  } else if (ratio >= 1.8) {
+    bucket = 'demanding';
+    commentary =
+      ratio >= 3
+        ? 'PEG above 3 signals stretched multiples relative to growth.'
+        : 'PEG above 1.8 requires flawless execution to justify.';
+  }
+
+  return {
+    bucket,
+    ratio,
+    normalizedGrowthPct: growth,
+    growthSource: source,
+    commentary,
+  };
 }
 
 /**
@@ -208,8 +313,13 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
   }
 
   const forwardPE = fundamentals.forwardPE ?? fundamentals.trailingPE;
-  const growth = fundamentals.epsGrowthYoYPct ?? fundamentals.revenueGrowthYoYPct ?? 0;
-  const peg = forwardPE && growth ? forwardPE / Math.max(growth, 1) : undefined;
+  const fallbackGrowth = fundamentals.epsGrowthYoYPct ?? fundamentals.revenueGrowthYoYPct;
+  const pegAssessment = evaluatePegRatio(fundamentals);
+  const peg =
+    pegAssessment?.ratio ??
+    (forwardPE && fallbackGrowth && fallbackGrowth > 0
+      ? forwardPE / Math.max(fallbackGrowth, 1)
+      : undefined);
   const earningsYieldPct = forwardPE ? (1 / forwardPE) * 100 : undefined;
   const fcfYield = fundamentals.freeCashFlowYieldPct;
   const dividendYield = fundamentals.dividendYieldPct;
@@ -224,7 +334,13 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
   let weightedScore = 0;
   let totalWeight = 0;
 
-  const addScore = (value: number | undefined, scorer: (v: number | undefined, strong: number, weak: number) => number, strong: number, weak: number, weight: number) => {
+  const addScore = (
+    value: number | undefined,
+    scorer: (v: number | undefined, strong: number, weak: number) => number,
+    strong: number,
+    weak: number,
+    weight: number
+  ) => {
     if (value === undefined) {
       return;
     }
@@ -232,7 +348,12 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
     totalWeight += weight;
   };
 
-  addScore(peg, scoreNegativeMetric, 1.1, 3, weights.peg);
+  if (pegAssessment) {
+    weightedScore += PEG_BUCKET_SCORES[pegAssessment.bucket] * weights.peg;
+    totalWeight += weights.peg;
+  } else {
+    addScore(forwardPE, scoreNegativeMetric, 15, 35, weights.peg);
+  }
   addScore(earningsYieldPct, scorePositiveMetric, 6, 2, weights.earningsYield);
   addScore(fcfYield, scorePositiveMetric, 5, 1, weights.fcfYield);
   addScore(dividendYield, scorePositiveMetric, 3, 0.2, weights.dividend);
@@ -260,9 +381,64 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
     commentary = 'Valuation metrics look balanced versus growth profile';
   }
 
+  const drivers: string[] = [];
+  const cautionaryNotes: string[] = [];
+
+  if (pegAssessment) {
+    if (pegAssessment.bucket === 'discount') {
+      drivers.push('PEG screens below 1x relative to growth inputs');
+    }
+    if (pegAssessment.bucket === 'balanced') {
+      drivers.push('PEG roughly aligned with growth trajectory');
+    }
+    if (pegAssessment.bucket === 'demanding') {
+      cautionaryNotes.push('Growth-adjusted PEG above 1.8x carries premium expectations');
+    }
+    if (pegAssessment.bucket === 'distorted') {
+      cautionaryNotes.push('PEG distorted because growth is limited or negative');
+    }
+
+    if (
+      pegAssessment.normalizedGrowthPct != null &&
+      pegAssessment.normalizedGrowthPct >= 20
+    ) {
+      const sourceLabel = pegAssessment.growthSource
+        ? GROWTH_SOURCE_TEXT[pegAssessment.growthSource]
+        : 'Growth';
+      drivers.push(`${sourceLabel} running near ${pegAssessment.normalizedGrowthPct.toFixed(0)}%`);
+    }
+  }
+
+  if (earningsYieldPct !== undefined) {
+    if (earningsYieldPct >= 6.5) {
+      drivers.push(`Earnings yield ${earningsYieldPct.toFixed(1)}% clears 6% hurdle`);
+    } else if (earningsYieldPct < 3) {
+      cautionaryNotes.push('Earnings yield below 3% offers thin cash support');
+    }
+  }
+
+  if (fcfYield !== undefined) {
+    if (fcfYield >= 5) {
+      drivers.push('Free cash flow yield exceeds 5%');
+    } else if (fcfYield < 1) {
+      cautionaryNotes.push('Free cash flow yield under 1% provides little downside protection');
+    }
+  }
+
+  if (dividendYield !== undefined && dividendYield >= 3) {
+    drivers.push('Dividend yield north of 3% adds income support');
+  }
+
+  if ((forwardPE ?? 0) >= 35) {
+    cautionaryNotes.push('Earnings multiples above 35x embed perfection');
+  }
+
   const detailParts: string[] = [];
   if (peg !== undefined) {
     detailParts.push(`PEG ${peg.toFixed(2)}`);
+  }
+  if (pegAssessment?.commentary) {
+    detailParts.push(pegAssessment.commentary);
   }
   if (earningsYieldPct !== undefined) {
     detailParts.push(`Earnings yield ${earningsYieldPct.toFixed(1)}%`);
@@ -278,14 +454,20 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
     commentary = `${commentary} (${detailParts.join(' | ')})`;
   }
 
+  const driverList = dedupe(drivers).slice(0, 3);
+  const cautionList = dedupe(cautionaryNotes).slice(0, 3);
+
   return {
     classification,
     valuationScore: roundScore(valuationScore),
     commentary,
     pegRatio: peg,
+    pegAssessment,
     earningsYieldPct,
     freeCashFlowYieldPct: fcfYield,
     dividendYieldPct: dividendYield,
+    drivers: driverList,
+    cautionaryNotes: cautionList,
   };
 }
 
@@ -893,6 +1075,12 @@ function composeValuationView(stock: StockData, insight: ValuationInsight): stri
   }
   if (insight.commentary) {
     parts.push(`Notes: ${insight.commentary}`);
+  }
+  if (insight.drivers && insight.drivers.length > 0) {
+    parts.push(`Drivers: ${insight.drivers.join(', ')}`);
+  }
+  if (insight.cautionaryNotes && insight.cautionaryNotes.length > 0) {
+    parts.push(`Watch: ${insight.cautionaryNotes.join(', ')}`);
   }
 
   if (insight.pegRatio !== undefined) {
