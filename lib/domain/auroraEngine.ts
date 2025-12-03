@@ -291,8 +291,17 @@ export function buildValuationInsight(stock: StockData): ValuationInsight {
 
 /**
  * Classifies stock fundamentals as 'strong', 'ok', 'weak', or 'unknown'.
+ * 
+ * Uses composite quality score with thresholds:
+ * - Strong: Score ≥ 70
+ * - OK: Score 40-69
+ * - Weak: Score < 40
+ * - Unknown: Missing data
+ * 
+ * @param stock - Stock data containing fundamentals
+ * @returns Classification string indicating fundamentals strength
  */
-function classifyFundamentals(stock: StockData): FundamentalsClass {
+export function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unknown' {
   if (!stock?.fundamentals) {
     return 'unknown';
   }
@@ -307,9 +316,14 @@ function classifyFundamentals(stock: StockData): FundamentalsClass {
 }
 
 /**
- * Classifies valuation based on multi-factor insight.
+ * Classifies stock valuation as 'cheap', 'fair', 'rich', or 'unknown'.
+ * 
+ * Uses multi-factor valuation insight with composite scoring.
+ * 
+ * @param stock - Stock data containing fundamentals
+ * @returns Classification string indicating valuation level
  */
-function classifyValuation(stock: StockData): ValuationClass {
+export function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unknown' {
   return buildValuationInsight(stock).classification;
 }
 
