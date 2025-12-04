@@ -25,6 +25,8 @@ import {
   GrowthSource,
   HistoricalData,
   HistoricalDataPoint,
+  MetricTooltip,
+  MetricId,
 } from './AnalysisTypes';
 
 type FundamentalsClass = FundamentalsInsight['classification'];
@@ -1307,4 +1309,222 @@ function composeSentimentView(sentiment: ReturnType<typeof analyzeSentiment>): s
   parts.push(`News: ${sentiment?.newsHighlight ?? 'N/A'}`);
 
   return parts.join(' | ');
+}
+
+/**
+ * Generate tooltip content for a financial metric
+ * 
+ * Provides plain-English explanations and interpretation guidance for metrics
+ * displayed throughout the application. Pure function - no side effects.
+ * 
+ * @param metricId - The identifier of the metric
+ * @returns MetricTooltip with explanation, interpretation, and context
+ * 
+ * @example
+ * const tooltip = generateMetricTooltip('trailingPE');
+ * // Returns: { title: "Trailing P/E Ratio", explanation: "...", ... }
+ */
+export function generateMetricTooltip(metricId: MetricId): MetricTooltip {
+  const tooltips: Record<MetricId, MetricTooltip> = {
+    // Fundamentals metrics
+    trailingPE: {
+      title: 'Trailing P/E Ratio',
+      explanation: 'Price divided by earnings per share over the past 12 months. Shows how much investors pay per dollar of historical earnings.',
+      interpretation: 'Lower values may indicate undervaluation (< 15 is cheap, 15-25 is fair, > 25 is expensive). High P/E can signal growth expectations or overvaluation.',
+      benchmark: 'S&P 500 average: ~20-25',
+      caveats: ['Compare within same industry', 'Growth stocks typically have higher P/E', 'Negative earnings make P/E meaningless'],
+    },
+    forwardPE: {
+      title: 'Forward P/E Ratio',
+      explanation: 'Price divided by expected earnings per share for the next 12 months. Shows market expectations for future profitability.',
+      interpretation: 'Lower is generally better. Forward P/E below Trailing P/E suggests earnings growth. Forward P/E > 20 implies strong growth expectations.',
+      benchmark: 'Generally 10-20% below Trailing P/E if growth expected',
+      caveats: ['Based on analyst estimates (may be wrong)', 'More speculative than trailing P/E'],
+    },
+    dividendYield: {
+      title: 'Dividend Yield',
+      explanation: 'Annual dividends per share divided by current stock price, expressed as a percentage. Measures income return.',
+      interpretation: 'Higher yield provides more income. 2-4% is typical for dividend stocks. Very high yields (> 6%) may signal distress or unsustainability.',
+      benchmark: 'S&P 500 average: ~1.5-2%',
+      caveats: ['High yield may indicate price drop, not sustainability', 'Growth stocks typically have low/no dividends'],
+    },
+    revenueGrowth: {
+      title: 'Revenue Growth (YoY)',
+      explanation: 'Percentage increase in total revenue compared to the same quarter last year. Measures top-line expansion.',
+      interpretation: 'Positive growth is good. > 10% is strong, > 20% is exceptional. Negative growth may signal declining demand.',
+      benchmark: 'Growth stocks: > 15%, Mature companies: 3-7%',
+      caveats: ['One-time events can skew growth', 'Check if growth is profitable or cash-burning'],
+    },
+    epsGrowth: {
+      title: 'EPS Growth (YoY)',
+      explanation: 'Percentage increase in earnings per share compared to last year. Measures bottom-line profitability growth.',
+      interpretation: 'Higher is better. > 10% is solid, > 20% is excellent. Consistent growth over time signals quality.',
+      benchmark: 'Quality growth stocks: 15-25% annually',
+      caveats: ['Can be manipulated through buybacks', 'Compare with revenue growth for validation'],
+    },
+    netMargin: {
+      title: 'Net Profit Margin',
+      explanation: 'Net income divided by revenue, expressed as a percentage. Shows how much profit a company keeps from each dollar of sales.',
+      interpretation: 'Higher is better. > 15% is strong, > 25% is exceptional. Indicates pricing power and operational efficiency.',
+      benchmark: 'Software: 20-30%, Retail: 2-5%, Manufacturing: 5-10%',
+      caveats: ['Varies greatly by industry', 'Can be distorted by one-time items'],
+    },
+    freeCashFlowYield: {
+      title: 'Free Cash Flow Yield',
+      explanation: 'Free cash flow per share divided by stock price. Measures cash generation relative to valuation.',
+      interpretation: 'Higher is better. > 5% is attractive, > 8% may indicate undervaluation. More reliable than earnings-based metrics.',
+      benchmark: 'Value stocks: 6-10%, Growth stocks: 2-4%',
+      caveats: ['FCF can be volatile quarter-to-quarter', 'Capital-intensive businesses may have lower yields'],
+    },
+    debtToEquity: {
+      title: 'Debt-to-Equity Ratio',
+      explanation: 'Total debt divided by shareholder equity. Measures financial leverage and balance sheet risk.',
+      interpretation: 'Lower is generally safer. < 0.5 is conservative, 0.5-1.5 is moderate, > 2.0 is aggressive. High leverage amplifies both gains and losses.',
+      benchmark: 'Conservative: < 0.5, Moderate: 0.5-1.5',
+      caveats: ['Industry norms vary (utilities have higher ratios)', 'Some debt can be healthy for growth'],
+    },
+    roe: {
+      title: 'Return on Equity (ROE)',
+      explanation: 'Net income divided by shareholder equity, expressed as a percentage. Measures profitability relative to equity.',
+      interpretation: 'Higher is better. > 15% is solid, > 20% is excellent. Shows how effectively management deploys capital.',
+      benchmark: 'Quality companies: 15-25%',
+      caveats: ['High leverage inflates ROE', 'Compare with cost of capital', 'Negative equity makes ROE meaningless'],
+    },
+
+    // Technical indicators
+    price: {
+      title: 'Current Price',
+      explanation: 'Latest trading price of the stock. Real-time market valuation.',
+      interpretation: 'Compare to moving averages, 52-week range, and analyst targets to gauge momentum and position.',
+      benchmark: 'Relative to historical range and intrinsic value estimates',
+    },
+    sma20: {
+      title: '20-Day Simple Moving Average',
+      explanation: 'Average closing price over the past 20 trading days. Short-term trend indicator.',
+      interpretation: 'Price above SMA20 suggests short-term uptrend. Price crossing above SMA20 can signal buying opportunity.',
+      benchmark: 'Price > SMA20 = bullish, Price < SMA20 = bearish',
+      caveats: ['Lagging indicator', 'Can generate false signals in choppy markets'],
+    },
+    sma50: {
+      title: '50-Day Simple Moving Average',
+      explanation: 'Average closing price over the past 50 trading days. Medium-term trend indicator.',
+      interpretation: 'Price above SMA50 indicates medium-term strength. SMA50 crossing above SMA200 ("golden cross") is bullish.',
+      benchmark: 'Key support/resistance level',
+      caveats: ['More reliable than SMA20 but slower to react'],
+    },
+    sma200: {
+      title: '200-Day Simple Moving Average',
+      explanation: 'Average closing price over the past 200 trading days. Long-term trend indicator.',
+      interpretation: 'Price above SMA200 indicates long-term uptrend. SMA200 is major support/resistance level watched by institutions.',
+      benchmark: 'Critical for determining bull/bear market status',
+      caveats: ['Very slow to react to changes', 'Less useful for volatile stocks'],
+    },
+    rsi14: {
+      title: 'RSI (14-Day)',
+      explanation: 'Relative Strength Index measures momentum on a scale of 0-100. Compares magnitude of recent gains to recent losses.',
+      interpretation: 'RSI > 70 = overbought (potential pullback), RSI < 30 = oversold (potential bounce). 40-60 is neutral zone.',
+      benchmark: 'Overbought: > 70, Oversold: < 30',
+      caveats: ['Can stay overbought/oversold for extended periods in strong trends', 'Not a timing tool on its own'],
+    },
+    price52wHigh: {
+      title: '52-Week High',
+      explanation: 'Highest price reached in the past 52 weeks. Represents recent peak valuation.',
+      interpretation: 'Distance from 52-week high shows momentum. Stocks near highs often continue higher (momentum), or may be due for pullback.',
+      benchmark: 'Within 5% of high = strong momentum',
+    },
+    price52wLow: {
+      title: '52-Week Low',
+      explanation: 'Lowest price reached in the past 52 weeks. Represents recent trough valuation.',
+      interpretation: 'Distance from 52-week low provides perspective. Near lows may signal opportunity or continued weakness.',
+      benchmark: 'Within 10% of low = potential turnaround or falling knife',
+    },
+    volume: {
+      title: 'Volume',
+      explanation: 'Number of shares traded today. Measures market participation and liquidity.',
+      interpretation: 'Higher volume on up days is bullish. Higher volume on down days is bearish. Low volume moves are less reliable.',
+      benchmark: 'Compare to average volume',
+    },
+    avgVolume: {
+      title: 'Average Volume',
+      explanation: 'Average number of shares traded per day over a recent period (typically 30-90 days).',
+      interpretation: 'Higher average volume indicates better liquidity and easier entry/exit. Institutional ownership typically requires high volume.',
+      benchmark: '> 1M shares/day for large caps',
+    },
+
+    // Risk metrics
+    riskScore: {
+      title: 'Risk Score',
+      explanation: 'Composite score (1-10) combining leverage, volatility, liquidity, and sentiment factors.',
+      interpretation: 'Lower is safer. 1-3 = low risk, 4-7 = moderate risk, 8-10 = high risk. Use for position sizing.',
+      benchmark: 'Conservative: < 4, Moderate: 4-7, Aggressive: > 7',
+      caveats: ['Risk is multidimensional', 'Score is a starting point, not a complete picture'],
+    },
+    convictionScore: {
+      title: 'Conviction Score',
+      explanation: 'Model confidence level (0-100%) for 3-month outlook based on signal strength across all factors.',
+      interpretation: 'Higher conviction suggests stronger signal alignment. Low conviction (< 50%) suggests mixed signals or uncertainty.',
+      benchmark: 'High conviction: > 70%, Low conviction: < 40%',
+      caveats: ['High conviction can be wrong', 'Consider alongside risk score'],
+    },
+    leverage: {
+      title: 'Leverage Risk',
+      explanation: 'Assessment of financial leverage risk based on debt-to-equity ratio.',
+      interpretation: 'Low leverage (< 0.8) is safer. High leverage (> 1.5) amplifies both gains and losses.',
+      benchmark: 'Conservative: < 0.5, Elevated: > 1.5',
+    },
+    volatility: {
+      title: 'Price Volatility',
+      explanation: 'Measure of price fluctuation based on 52-week high/low range.',
+      interpretation: 'Higher volatility means larger price swings. Low volatility (< 35%) is more stable.',
+      benchmark: 'Low: < 35%, Moderate: 35-65%, High: > 65%',
+    },
+    liquidity: {
+      title: 'Liquidity Risk',
+      explanation: 'Assessment of trading liquidity based on volume ratio (current vs. average).',
+      interpretation: 'Higher volume ratio (> 1.2x average) indicates good liquidity. Low liquidity (< 0.7x) makes entry/exit harder.',
+      benchmark: 'Good: > 1.2x, Concerning: < 0.7x',
+    },
+    sentiment: {
+      title: 'Market Sentiment',
+      explanation: 'Blend of analyst consensus ratings and narrative sentiment from news/social media.',
+      interpretation: 'Positive sentiment (buy/strong buy) suggests institutional support. Negative sentiment may indicate headwinds.',
+      benchmark: 'Bullish: strong buy/buy, Neutral: hold, Bearish: sell/strong sell',
+      caveats: ['Sentiment is a contrarian indicator when extreme', 'Lags fundamental changes'],
+    },
+
+    // Valuation metrics
+    pegRatio: {
+      title: 'PEG Ratio',
+      explanation: 'P/E ratio divided by earnings growth rate. Normalizes valuation for growth.',
+      interpretation: 'PEG < 1 suggests undervalued relative to growth. PEG > 2 suggests overvalued. Best for comparing growth stocks.',
+      benchmark: 'Attractive: < 1, Fair: 1-2, Expensive: > 2',
+      caveats: ['Only works with positive, sustainable growth', 'Quality of growth matters more than quantity'],
+    },
+    earningsYield: {
+      title: 'Earnings Yield',
+      explanation: 'Earnings per share divided by price (inverse of P/E), expressed as percentage. Shows earnings return.',
+      interpretation: 'Higher is better. Compare to bond yields. > 6% is attractive, especially if > 10-year Treasury.',
+      benchmark: 'Should exceed risk-free rate (10-year Treasury)',
+    },
+    priceToBook: {
+      title: 'Price-to-Book Ratio',
+      explanation: 'Market cap divided by book value (net assets). Shows premium to accounting value.',
+      interpretation: 'Lower may indicate value. P/B < 1 suggests trading below asset value. High P/B signals intangibles or growth premium.',
+      benchmark: 'Value: < 1.5, Growth: > 3',
+      caveats: ['Book value often outdated', 'Less relevant for asset-light businesses'],
+    },
+    priceToSales: {
+      title: 'Price-to-Sales Ratio',
+      explanation: 'Market cap divided by annual revenue. Shows valuation relative to top-line.',
+      interpretation: 'Lower is generally better. P/S < 2 is reasonable, > 5 is expensive. Useful for unprofitable companies.',
+      benchmark: 'Mature: 1-3, Growth: 3-10',
+      caveats: ['Ignores profitability', 'Varies widely by industry margins'],
+    },
+  };
+
+  return tooltips[metricId] || {
+    title: metricId,
+    explanation: 'No explanation available for this metric.',
+    interpretation: 'Please refer to financial literature for guidance.',
+  };
 }
