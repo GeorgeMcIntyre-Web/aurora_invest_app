@@ -15,6 +15,8 @@ import { HistoricalCard } from './historical-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { FinancialTooltip } from './financial-tooltip';
 import { cn } from '@/lib/utils';
 
 type HistoricalPeriod = HistoricalData['period'];
@@ -88,80 +90,87 @@ export function AnalysisDashboard({
   };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-ai-primary to-ai-accent rounded-lg p-8 text-white">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold">
-              {result?.name ?? result?.ticker ?? 'Stock'} ({result?.ticker})
-            </h1>
-            <p className="text-sm opacity-90 mt-1">
-              Analysis generated on {new Date(result?.generatedAt ?? '').toLocaleString()}
-            </p>
-          </div>
-          <ExportButtons result={result} />
-        </div>
-      </div>
-
-      {/* Summary Banner */}
-      <div className="bg-ai-card border border-gray-700 rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Award className="h-6 w-6 text-ai-accent" />
-          <h2 className="text-xl font-bold text-ai-text">Analysis Summary</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {/* Headline View */}
-          <div className="md:col-span-3">
-            <p className="text-lg text-ai-text">{summary?.headlineView ?? ''}</p>
-          </div>
-
-          {/* Risk Score */}
-          <div className="bg-ai-bg p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="h-5 w-5 text-ai-primary" />
-              <div className="text-sm text-ai-muted">Risk Score</div>
+    <TooltipProvider>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-ai-primary to-ai-accent rounded-lg p-8 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold">
+                {result?.name ?? result?.ticker ?? 'Stock'} ({result?.ticker})
+              </h1>
+              <p className="text-sm opacity-90 mt-1">
+                Analysis generated on {new Date(result?.generatedAt ?? '').toLocaleString()}
+              </p>
             </div>
-            <div className="text-3xl font-bold text-ai-text">
-              {summary?.riskScore ?? 0}/10
-            </div>
-            <div className="text-xs text-ai-muted mt-1">
-              {summary?.riskScore <= 3 && 'Low Risk'}
-              {summary?.riskScore > 3 && summary?.riskScore <= 7 && 'Moderate Risk'}
-              {summary?.riskScore > 7 && 'High Risk'}
-            </div>
-          </div>
-
-          {/* Conviction Score */}
-          <div className="bg-ai-bg p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-5 w-5 text-ai-accent" />
-              <div className="text-sm text-ai-muted">3-Month Conviction</div>
-            </div>
-            <div className="text-3xl font-bold text-ai-text">
-              {summary?.convictionScore3m ?? 0}%
-            </div>
-            <div className="text-xs text-ai-muted mt-1">
-              {summary?.convictionScore3m < 45 && 'Low Confidence'}
-              {summary?.convictionScore3m >= 45 && summary?.convictionScore3m <= 55 && 'Moderate Confidence'}
-              {summary?.convictionScore3m > 55 && 'Higher Confidence'}
-            </div>
-          </div>
-
-          {/* Weighted Estimate */}
-          <div className="bg-ai-bg p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-              <div className="text-sm text-ai-muted">3-Month Estimate</div>
-            </div>
-            <div className="text-3xl font-bold text-ai-text">
-              {scenarios?.pointEstimateReturnPct > 0 ? '+' : ''}
-              {scenarios?.pointEstimateReturnPct?.toFixed?.(1) ?? '0.0'}%
-            </div>
-            <div className="text-xs text-ai-muted mt-1">Probability-weighted</div>
+            <ExportButtons result={result} />
           </div>
         </div>
+
+        {/* Summary Banner */}
+        <div className="bg-ai-card border border-gray-700 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Award className="h-6 w-6 text-ai-accent" />
+            <h2 className="text-xl font-bold text-ai-text">Analysis Summary</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            {/* Headline View */}
+            <div className="md:col-span-3">
+              <p className="text-lg text-ai-text">{summary?.headlineView ?? ''}</p>
+            </div>
+
+            {/* Risk Score */}
+            <div className="bg-ai-bg p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-5 w-5 text-ai-primary" />
+                <FinancialTooltip term="riskScore">
+                  <div className="text-sm text-ai-muted">Risk Score</div>
+                </FinancialTooltip>
+              </div>
+              <div className="text-3xl font-bold text-ai-text">
+                {summary?.riskScore ?? 0}/10
+              </div>
+              <div className="text-xs text-ai-muted mt-1">
+                {summary?.riskScore <= 3 && 'Low Risk'}
+                {summary?.riskScore > 3 && summary?.riskScore <= 7 && 'Moderate Risk'}
+                {summary?.riskScore > 7 && 'High Risk'}
+              </div>
+            </div>
+
+            {/* Conviction Score */}
+            <div className="bg-ai-bg p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-5 w-5 text-ai-accent" />
+                <FinancialTooltip term="convictionScore">
+                  <div className="text-sm text-ai-muted">3-Month Conviction</div>
+                </FinancialTooltip>
+              </div>
+              <div className="text-3xl font-bold text-ai-text">
+                {summary?.convictionScore3m ?? 0}%
+              </div>
+              <div className="text-xs text-ai-muted mt-1">
+                {summary?.convictionScore3m < 45 && 'Low Confidence'}
+                {summary?.convictionScore3m >= 45 && summary?.convictionScore3m <= 55 && 'Moderate Confidence'}
+                {summary?.convictionScore3m > 55 && 'Higher Confidence'}
+              </div>
+            </div>
+
+            {/* Weighted Estimate */}
+            <div className="bg-ai-bg p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="h-5 w-5 text-yellow-500" />
+                <FinancialTooltip term="pointEstimate">
+                  <div className="text-sm text-ai-muted">3-Month Estimate</div>
+                </FinancialTooltip>
+              </div>
+              <div className="text-3xl font-bold text-ai-text">
+                {scenarios?.pointEstimateReturnPct > 0 ? '+' : ''}
+                {scenarios?.pointEstimateReturnPct?.toFixed?.(1) ?? '0.0'}%
+              </div>
+              <div className="text-xs text-ai-muted mt-1">Probability-weighted</div>
+            </div>
+          </div>
 
         {/* Key Takeaways */}
         <div className="mt-6">
@@ -358,6 +367,7 @@ export function AnalysisDashboard({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
