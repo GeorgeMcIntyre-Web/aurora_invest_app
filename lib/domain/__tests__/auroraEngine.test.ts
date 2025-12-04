@@ -6,6 +6,7 @@ import {
   calculateReturns,
   calculateVolatility,
   detectTrend,
+  generateMetricTooltip,
 } from '../auroraEngine';
 import {
   HistoricalData,
@@ -361,5 +362,185 @@ describe('analyzeStock scenarios and guidance', () => {
     expect(result.planningGuidance.positionSizing.length).toBeGreaterThan(0);
     expect(result.summary.keyTakeaways.some((item) => item.includes('Fundamentals'))).toBe(true);
     expect(result.disclaimer).toContain('educational');
+  });
+});
+
+describe('generateMetricTooltip', () => {
+  it('returns tooltip with all required fields for fundamental metrics', () => {
+    const tooltip = generateMetricTooltip('trailingPE');
+    expect(tooltip.title).toBe('Trailing P/E Ratio');
+    expect(tooltip.explanation).toBeTruthy();
+    expect(tooltip.explanation.length).toBeGreaterThan(20);
+    expect(tooltip.interpretation).toBeTruthy();
+    expect(tooltip.interpretation.length).toBeGreaterThan(20);
+  });
+
+  it('provides actionable interpretation guidance for P/E ratios', () => {
+    const trailingPE = generateMetricTooltip('trailingPE');
+    const forwardPE = generateMetricTooltip('forwardPE');
+    
+    expect(trailingPE.interpretation).toContain('Lower');
+    expect(trailingPE.benchmark).toBeTruthy();
+    expect(trailingPE.caveats).toBeDefined();
+    expect(trailingPE.caveats!.length).toBeGreaterThan(0);
+    
+    expect(forwardPE.title).toContain('Forward');
+    expect(forwardPE.explanation).toContain('expected');
+  });
+
+  it('provides contextual benchmarks for valuation metrics', () => {
+    const dividendYield = generateMetricTooltip('dividendYield');
+    const roe = generateMetricTooltip('roe');
+    
+    expect(dividendYield.benchmark).toContain('%');
+    expect(dividendYield.interpretation).toContain('income');
+    
+    expect(roe.benchmark).toContain('%');
+    expect(roe.interpretation).toContain('capital');
+  });
+
+  it('explains technical indicators with clear thresholds', () => {
+    const rsi = generateMetricTooltip('rsi14');
+    const sma200 = generateMetricTooltip('sma200');
+    
+    expect(rsi.explanation).toContain('momentum');
+    expect(rsi.interpretation).toContain('70');
+    expect(rsi.interpretation).toContain('30');
+    expect(rsi.benchmark).toBeTruthy();
+    
+    expect(sma200.explanation).toContain('200');
+    expect(sma200.interpretation).toContain('trend');
+  });
+
+  it('provides risk metric context for position sizing', () => {
+    const riskScore = generateMetricTooltip('riskScore');
+    const convictionScore = generateMetricTooltip('convictionScore');
+    
+    expect(riskScore.explanation).toContain('1-10');
+    expect(riskScore.interpretation).toContain('position sizing');
+    expect(riskScore.benchmark).toBeTruthy();
+    
+    expect(convictionScore.explanation).toContain('0-100');
+    expect(convictionScore.interpretation).toContain('conviction');
+  });
+
+  it('explains leverage and volatility risks clearly', () => {
+    const leverage = generateMetricTooltip('leverage');
+    const volatility = generateMetricTooltip('volatility');
+    
+    expect(leverage.explanation).toContain('debt');
+    expect(leverage.interpretation).toContain('leverage');
+    
+    expect(volatility.explanation).toContain('fluctuation');
+    expect(volatility.interpretation).toContain('volatility');
+    expect(volatility.benchmark).toBeTruthy();
+  });
+
+  it('provides market sentiment interpretation', () => {
+    const sentiment = generateMetricTooltip('sentiment');
+    
+    expect(sentiment.explanation).toContain('analyst');
+    expect(sentiment.interpretation).toContain('sentiment');
+    expect(sentiment.caveats).toBeDefined();
+    expect(sentiment.caveats!.length).toBeGreaterThan(0);
+  });
+
+  it('explains advanced valuation metrics like PEG ratio', () => {
+    const peg = generateMetricTooltip('pegRatio');
+    
+    expect(peg.explanation).toContain('growth');
+    expect(peg.interpretation).toContain('< 1');
+    expect(peg.benchmark).toBeTruthy();
+    expect(peg.caveats).toBeDefined();
+  });
+
+  it('provides volume and liquidity context', () => {
+    const volume = generateMetricTooltip('volume');
+    const avgVolume = generateMetricTooltip('avgVolume');
+    const liquidity = generateMetricTooltip('liquidity');
+    
+    expect(volume.explanation).toContain('shares');
+    expect(volume.interpretation).toContain('volume');
+    
+    expect(avgVolume.explanation.toLowerCase()).toContain('average');
+    expect(avgVolume.interpretation).toContain('liquidity');
+    
+    expect(liquidity.explanation).toContain('volume');
+    expect(liquidity.interpretation).toContain('liquidity');
+  });
+
+  it('handles all fundamental metrics without errors', () => {
+    const fundamentalMetrics = [
+      'trailingPE', 'forwardPE', 'dividendYield', 'revenueGrowth', 
+      'epsGrowth', 'netMargin', 'freeCashFlowYield', 'debtToEquity', 'roe'
+    ];
+    
+    fundamentalMetrics.forEach(metricId => {
+      const tooltip = generateMetricTooltip(metricId as any);
+      expect(tooltip.title).toBeTruthy();
+      expect(tooltip.explanation).toBeTruthy();
+      expect(tooltip.interpretation).toBeTruthy();
+    });
+  });
+
+  it('handles all technical metrics without errors', () => {
+    const technicalMetrics = [
+      'price', 'sma20', 'sma50', 'sma200', 'rsi14', 
+      'price52wHigh', 'price52wLow', 'volume', 'avgVolume'
+    ];
+    
+    technicalMetrics.forEach(metricId => {
+      const tooltip = generateMetricTooltip(metricId as any);
+      expect(tooltip.title).toBeTruthy();
+      expect(tooltip.explanation).toBeTruthy();
+      expect(tooltip.interpretation).toBeTruthy();
+    });
+  });
+
+  it('handles all risk metrics without errors', () => {
+    const riskMetrics = [
+      'riskScore', 'convictionScore', 'leverage', 
+      'volatility', 'liquidity', 'sentiment'
+    ];
+    
+    riskMetrics.forEach(metricId => {
+      const tooltip = generateMetricTooltip(metricId as any);
+      expect(tooltip.title).toBeTruthy();
+      expect(tooltip.explanation).toBeTruthy();
+      expect(tooltip.interpretation).toBeTruthy();
+    });
+  });
+
+  it('handles all valuation metrics without errors', () => {
+    const valuationMetrics = [
+      'pegRatio', 'earningsYield', 'priceToBook', 'priceToSales'
+    ];
+    
+    valuationMetrics.forEach(metricId => {
+      const tooltip = generateMetricTooltip(metricId as any);
+      expect(tooltip.title).toBeTruthy();
+      expect(tooltip.explanation).toBeTruthy();
+      expect(tooltip.interpretation).toBeTruthy();
+    });
+  });
+
+  it('provides caveats for metrics that need context', () => {
+    const metricsWithCaveats = ['trailingPE', 'forwardPE', 'dividendYield', 'debtToEquity', 'roe'];
+    
+    metricsWithCaveats.forEach(metricId => {
+      const tooltip = generateMetricTooltip(metricId as any);
+      expect(tooltip.caveats).toBeDefined();
+      expect(tooltip.caveats!.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('is a pure function - returns same output for same input', () => {
+    const result1 = generateMetricTooltip('trailingPE');
+    const result2 = generateMetricTooltip('trailingPE');
+    
+    expect(result1).toEqual(result2);
+    expect(result1.title).toBe(result2.title);
+    expect(result1.explanation).toBe(result2.explanation);
+    expect(result1.interpretation).toBe(result2.interpretation);
   });
 });

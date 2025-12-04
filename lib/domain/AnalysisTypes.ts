@@ -157,3 +157,57 @@ export interface PortfolioContext {
   suggestedAction: PortfolioActionSuggestion;
   reasoning: string[];
 }
+
+/**
+ * Tooltip content for a financial metric
+ * Provides context, explanation, and interpretation guidance
+ */
+export interface MetricTooltip {
+  /** Short title of the metric */
+  title: string;
+  /** Plain English explanation of what this metric measures */
+  explanation: string;
+  /** What makes this metric "good" or "bad" */
+  interpretation: string;
+  /** Optional: Typical range or benchmark values */
+  benchmark?: string;
+  /** Optional: Key considerations or caveats */
+  caveats?: string[];
+}
+
+/**
+ * All metric identifiers that can have tooltips
+ */
+export type MetricId =
+  // Fundamentals
+  | 'trailingPE'
+  | 'forwardPE'
+  | 'dividendYield'
+  | 'revenueGrowth'
+  | 'epsGrowth'
+  | 'netMargin'
+  | 'freeCashFlowYield'
+  | 'debtToEquity'
+  | 'roe'
+  // Technicals
+  | 'price'
+  | 'sma20'
+  | 'sma50'
+  | 'sma200'
+  | 'rsi14'
+  | 'price52wHigh'
+  | 'price52wLow'
+  | 'volume'
+  | 'avgVolume'
+  // Risk factors
+  | 'riskScore'
+  | 'convictionScore'
+  | 'leverage'
+  | 'volatility'
+  | 'liquidity'
+  | 'sentiment'
+  // Valuation
+  | 'pegRatio'
+  | 'earningsYield'
+  | 'priceToBook'
+  | 'priceToSales';
