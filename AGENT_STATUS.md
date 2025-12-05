@@ -127,8 +127,11 @@ Dev Server: Not tested (long-lived servers disallowed in Cursor)
 ### Work Completed:
 - ✅ Implemented request queue and caching
 - ✅ Enhanced error handling in app/page.tsx
+- ✅ Added Active Manager orchestration state and dashboard wiring
 - ✅ Build passes with 0 TypeScript errors
 - ✅ Production-ready orchestration layer
+
+**Active Manager wiring:** `app/page.tsx` now tracks `activeManagerRecommendation`, `activeManagerError`, and `activeManagerLoading`, resetting the trio whenever a submission begins. The page calls `buildActiveManagerRecommendation` immediately after `analyzeStock` returns (and again once portfolio context resolves) and passes the results into `components/analysis-dashboard.tsx`, which renders the new guidance panel.
 
 ### Reality Snapshot:
 ```bash

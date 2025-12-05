@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
 import { AnalysisResult, StockData, HistoricalData, PortfolioContext } from '@/lib/domain/AnalysisTypes';
+import type { ActiveManagerRecommendation } from '@/lib/domain/activeManagerEngine';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
@@ -34,6 +35,9 @@ interface AnalysisDashboardProps {
   portfolioError?: string | null;
   onQuickAddHolding?: (input: { shares: number; averageCostBasis: number; purchaseDate: string }) => Promise<void>;
   quickAddBusy?: boolean;
+  activeManagerRecommendation?: ActiveManagerRecommendation | null;
+  activeManagerError?: string | null;
+  activeManagerLoading?: boolean;
 }
 
 export function AnalysisDashboard({
@@ -49,6 +53,9 @@ export function AnalysisDashboard({
   portfolioError = null,
   onQuickAddHolding,
   quickAddBusy = false,
+  activeManagerRecommendation,
+  activeManagerError = null,
+  activeManagerLoading = false,
 }: AnalysisDashboardProps) {
   if (!result) {
     return null;
@@ -58,6 +65,11 @@ export function AnalysisDashboard({
   const scenarios = result?.scenarios;
   const planningGuidance = result?.planningGuidance;
   const historicalDataset = historicalSeries?.[selectedPeriod] ?? null;
+  const showActiveManagerGuidance =
+    activeManagerLoading ||
+    Boolean(activeManagerError) ||
+    Boolean(activeManagerRecommendation);
+  const formatLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
   const [quickAddShares, setQuickAddShares] = useState('');
   const [quickAddCost, setQuickAddCost] = useState('');
   const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
@@ -185,6 +197,102 @@ export function AnalysisDashboard({
           </ul>
         </div>
       </div>
+
+    {showActiveManagerGuidance && (
+      <div className="bg-ai-card border border-gray-700 rounded-lg p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <Lightbulb className="h-5 w-5 text-ai-primary" />
+          <h2 className="text-lg font-semibold text-ai-text">Active Manager Guidance</h2>
+          <div className="flex-1" />
+          {activeManagerLoading && (
+            <div className="flex items-center gap-2 text-xs text-ai-muted">
+              <span className="h-3 w-3 rounded-full border-2 border-ai-primary border-t-transparent animate-spin" />
+              Evaluating...
+            </div>
+          )}
+        </div>
+
+        {activeManagerError && !activeManagerLoading && (
+          <p className="text-sm text-red-400">{activeManagerError}</p>
+        )}
+
+        {!activeManagerLoading && !activeManagerError && activeManagerRecommendation && (
+          <div className="space-y-5">
+            <p className="text-sm text-ai-muted">{activeManagerRecommendation.summary}</p>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="bg-ai-bg p-4 rounded-lg">
+                <div className="text-xs uppercase text-ai-muted mb-1">Mandate Fit</div>
+                <div className="text-lg font-semibold text-ai-text">
+                  {formatLabel(activeManagerRecommendation.mandateFit)}
+                </div>
+                <div className="text-xs text-ai-muted">
+                  {activeManagerRecommendation.timeHorizonMonths}-month horizon
+                </div>
+              </div>
+              <div className="bg-ai-bg p-4 rounded-lg">
+                <div className="text-xs uppercase text-ai-muted mb-1">Oversight</div>
+                <div className="text-lg font-semibold text-ai-text">
+                  {formatLabel(activeManagerRecommendation.oversightLevel)}
+                </div>
+                <div className="text-xs text-ai-muted">Manager monitoring cadence</div>
+              </div>
+              <div className="bg-ai-bg p-4 rounded-lg">
+                <div className="text-xs uppercase text-ai-muted mb-1">Suitability Score</div>
+                <div className="text-lg font-semibold text-ai-text">
+                  {activeManagerRecommendation.suitabilityScore}/100
+                </div>
+                <div className="text-xs text-ai-muted">Blends risk & conviction inputs</div>
+              </div>
+            </div>
+
+            {activeManagerRecommendation.rationale?.length ? (
+              <div>
+                <div className="text-sm font-medium text-ai-muted mb-2">Key rationale</div>
+                <ul className="space-y-2">
+                  {activeManagerRecommendation.rationale.slice(0, 3).map((item, index) => (
+                    <li key={`am-rationale-${index}`} className="flex gap-2 text-sm text-ai-text">
+                      <span className="text-ai-accent mt-0.5">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {activeManagerRecommendation.actionChecklist?.length ? (
+              <div>
+                <div className="text-sm font-medium text-ai-muted mb-2">Action checklist</div>
+                <ul className="space-y-2">
+                  {activeManagerRecommendation.actionChecklist.slice(0, 3).map((item, index) => (
+                    <li key={`am-action-${index}`} className="flex gap-2 text-sm text-ai-text">
+                      <span className="text-ai-primary mt-0.5">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {activeManagerRecommendation.monitoringFocus?.length ? (
+              <div>
+                <div className="text-sm font-medium text-ai-muted mb-2">Monitoring focus</div>
+                <ul className="space-y-2">
+                  {activeManagerRecommendation.monitoringFocus.slice(0, 3).map((item, index) => (
+                    <li key={`am-monitor-${index}`} className="flex gap-2 text-sm text-ai-text">
+                      <span className="text-yellow-500 mt-0.5">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <p className="text-xs text-ai-muted">{activeManagerRecommendation.messagingCue}</p>
+          </div>
+        )}
+      </div>
+    )}
 
       {(portfolioLoading || portfolioContext || portfolioError) && (
         <div className="bg-ai-card border border-gray-700 rounded-lg p-6 space-y-4">
