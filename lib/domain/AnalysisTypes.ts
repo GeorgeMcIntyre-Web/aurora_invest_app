@@ -156,6 +156,21 @@ export interface PortfolioContext {
   portfolioMetrics: PortfolioMetrics;
   suggestedAction: PortfolioActionSuggestion;
   reasoning: string[];
+  positionWeightPct?: number;
+}
+
+export type ActiveManagerHorizon = 'short_term' | 'medium_term' | 'long_term';
+
+export interface ActiveManagerRecommendation {
+  ticker: string;
+  primaryAction: PortfolioAction;
+  horizon: ActiveManagerHorizon;
+  confidenceScore: number;
+  expectedReturn3m?: number;
+  headline: string;
+  rationale: string[];
+  riskFlags: string[];
+  notes: string[];
 }
 
 // Tooltip Engine Types
