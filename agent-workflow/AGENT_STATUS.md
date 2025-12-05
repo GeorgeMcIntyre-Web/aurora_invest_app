@@ -102,11 +102,40 @@ Successfully implemented hover-based financial tooltips across all analytics das
 
 ---
 
+## Agent 1 – Active Manager
+
+**Branch:** `cursor/setup-active-manager-contracts-and-reality-snapshot-gpt-5.1-codex-high-a4c9`  
+**Owner:** Agent 1 (Domain Engine Specialist)  
+**Date:** 2025-12-05
+
+### Summary
+- Added Active Manager domain types (`ActiveManagerTimeframe`, `ActiveManagerRecommendation`) to `lib/domain/AnalysisTypes.ts`.
+- Created `agent-workflow/contracts/ActiveManagerContracts.ts` so UI/services have a single import surface for Active Manager types.
+- Established shared guardrails in `agent-workflow/GLOBAL_RULES.md` and appended an Active Manager section to `REALITY_SNAPSHOT.md`.
+
+### Files Changed
+- `lib/domain/AnalysisTypes.ts`
+- `agent-workflow/GLOBAL_RULES.md`
+- `agent-workflow/contracts/ActiveManagerContracts.ts`
+- `REALITY_SNAPSHOT.md`
+- `agent-workflow/AGENT_STATUS.md`
+
+### Build / Test Verification
+- `npm run build` → ✅ Success (Next.js 14.2.28). Only warning is the existing `metadataBase` notice from Next.js metadata generation.
+- `npm test` → ✅ 5 suites / 81 tests passing (Vitest v4.0.15). No skipped or empty suites.
+
+### TODO / Follow-Ups
+1. Wire the new `ActiveManagerRecommendation` contract into upcoming Active Manager orchestration (auroraEngine + services not yet consuming it).
+2. Configure Next.js `metadataBase` to eliminate the recurring warning during `next build`.
+
+---
+
 ## Pipeline Status Summary
 
 | Issue | Feature | Status | Branch | Tests | Notes |
 |-------|---------|--------|--------|-------|-------|
 | #17 | Hover-based Financial Tooltips | ✅ Merged | `feature/hover-tooltips-financial-analytics` | 81/81 passing | Pure domain engine + UI components |
+| — | Agent 1 – Active Manager | 🚧 Active | `cursor/setup-active-manager-contracts-and-reality-snapshot-gpt-5.1-codex-high-a4c9` | 81/81 passing | Types + workflow contracts landed |
 
 ---
 

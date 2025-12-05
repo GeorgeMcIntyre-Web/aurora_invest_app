@@ -158,6 +158,19 @@ export interface PortfolioContext {
   reasoning: string[];
 }
 
+export type ActiveManagerTimeframe = 'short_term' | 'medium_term' | 'long_term';
+
+export interface ActiveManagerRecommendation {
+  ticker: string;
+  primaryAction: PortfolioAction;
+  confidenceScore: number;
+  headline: string;
+  rationale: string[];
+  riskFlags: string[];
+  timeframe: ActiveManagerTimeframe;
+  notes?: string[];
+}
+
 // Tooltip Engine Types
 export type FinancialTerm =
   // Valuation metrics
