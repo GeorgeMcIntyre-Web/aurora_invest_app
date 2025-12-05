@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle, BrainCircuit, Loader2 } from 'lucide-react';
 import { AnalysisResult, StockData, HistoricalData, PortfolioContext, ActiveManagerRecommendation } from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
@@ -16,6 +16,7 @@ import { ActiveManagerCard } from './active-manager-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { FinancialTooltip } from './financial-tooltip';
 import { cn } from '@/lib/utils';
@@ -69,6 +70,35 @@ export function AnalysisDashboard({
   const [quickAddCost, setQuickAddCost] = useState('');
   const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{ reasoning: string; analysis: string } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const runDeepAnalysis = async () => {
+    setAiLoading(true);
+    try {
+      const response = await fetch('/api/ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: stock.ticker,
+          fundamentals: stock.fundamentals,
+          technicals: stock.technicals,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI analysis request failed');
+      }
+
+      const data = await response.json();
+      setAiAnalysis(data);
+    } catch (error) {
+      console.error('AI Analysis failed', error);
+      setAiAnalysis(null);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const handleQuickAdd = async () => {
     if (!onQuickAddHolding) {
@@ -192,6 +222,53 @@ export function AnalysisDashboard({
           </ul>
         </div>
       </div>
+
+        {/* Deep Math Analysis Section */}
+        <div className="bg-ai-card border border-ai-accent/30 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <BrainCircuit className="h-6 w-6 text-purple-400" />
+              <h2 className="text-xl font-bold text-ai-text">Deep Math V2 Verification</h2>
+            </div>
+            <Button
+              onClick={() => void runDeepAnalysis()}
+              disabled={aiLoading}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {aiLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying Math...
+                </>
+              ) : (
+                'Run Deep Verification'
+              )}
+            </Button>
+          </div>
+
+          {aiAnalysis && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4">
+              <Card className="bg-black/20 border-purple-500/30">
+                <CardHeader>
+                  <CardTitle className="text-sm font-mono text-purple-300">STEP-BY-STEP REASONING</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-invert prose-sm max-h-[400px] overflow-y-auto font-mono text-xs text-gray-300 whitespace-pre-wrap bg-black/40 p-4 rounded">
+                    {aiAnalysis.reasoning}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-ai-bg/50">
+                <CardHeader>
+                  <CardTitle className="text-ai-accent">Strategic Conclusion</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-invert text-sm text-ai-text whitespace-pre-wrap">{aiAnalysis.analysis}</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
 
       {(portfolioLoading || portfolioContext || portfolioError) && (
         <div className="bg-ai-card border border-gray-700 rounded-lg p-6 space-y-4">
