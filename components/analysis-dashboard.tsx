@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle, BrainCircuit, Loader2 } from 'lucide-react';
-import { AnalysisResult, StockData, HistoricalData, PortfolioContext } from '@/lib/domain/AnalysisTypes';
+import { AnalysisResult, StockData, HistoricalData, PortfolioContext, ActiveManagerRecommendation } from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
@@ -12,6 +12,7 @@ import { ExportButtons } from './export-buttons';
 import { RiskCard } from './risk-card';
 import { HistoricalChart } from './historical-chart';
 import { HistoricalCard } from './historical-card';
+import { ActiveManagerCard } from './active-manager-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,9 @@ interface AnalysisDashboardProps {
   portfolioError?: string | null;
   onQuickAddHolding?: (input: { shares: number; averageCostBasis: number; purchaseDate: string }) => Promise<void>;
   quickAddBusy?: boolean;
+  activeManagerRecommendation?: ActiveManagerRecommendation | null;
+  activeManagerLoading?: boolean;
+  activeManagerError?: string | null;
 }
 
 export function AnalysisDashboard({
@@ -50,6 +54,9 @@ export function AnalysisDashboard({
   portfolioError = null,
   onQuickAddHolding,
   quickAddBusy = false,
+  activeManagerRecommendation,
+  activeManagerLoading = false,
+  activeManagerError = null,
 }: AnalysisDashboardProps) {
   if (!result) {
     return null;
@@ -433,6 +440,13 @@ export function AnalysisDashboard({
           )}
         </div>
       </div>
+
+      {/* Active Manager Recommendation */}
+      <ActiveManagerCard
+        recommendation={activeManagerRecommendation ?? null}
+        loading={activeManagerLoading}
+        error={activeManagerError}
+      />
 
       {/* Disclaimer */}
       <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6">

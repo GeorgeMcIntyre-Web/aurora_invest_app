@@ -220,3 +220,19 @@ export interface TooltipContent {
   formula?: string;
   category: 'valuation' | 'growth' | 'profitability' | 'liquidity' | 'technical' | 'sentiment' | 'portfolio' | 'scenario';
 }
+
+// ============================================================================
+// Active Manager Types (re-exported from contracts)
+// ============================================================================
+
+export type {
+  ActiveManagerTimeframe,
+  ActiveManagerRecommendation,
+  ActiveManagerInput,
+  ActiveManagerConfig,
+} from '../../agent-workflow/contracts/ActiveManagerContracts';
+
+export {
+  DEFAULT_ACTIVE_MANAGER_CONFIG,
+  ACTIVE_MANAGER_DISCLAIMER,
+} from '../../agent-workflow/contracts/ActiveManagerContracts';
