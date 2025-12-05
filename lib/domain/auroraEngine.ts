@@ -18,88 +18,668 @@ import {
   PlanningGuidance,
   ScenarioBand,
   AnalystConsensus,
+  FundamentalsInsight,
+  ValuationInsight,
+  PegAssessment,
+  PegBucket,
+  GrowthSource,
+  HistoricalData,
+  HistoricalDataPoint,
 } from './AnalysisTypes';
+
+type FundamentalsClass = FundamentalsInsight['classification'];
+type ValuationClass = ValuationInsight['classification'];
+
+const DEFAULT_FUNDAMENTALS_INSIGHT: FundamentalsInsight = {
+  classification: 'unknown',
+  qualityScore: 0,
+  drivers: [],
+  cautionaryNotes: ['Fundamentals data not available.'],
+};
+
+const DEFAULT_VALUATION_INSIGHT: ValuationInsight = {
+  classification: 'unknown',
+  valuationScore: 0,
+  commentary: 'Valuation data not available.',
+  drivers: [],
+  cautionaryNotes: [],
+};
+
+function scorePositiveMetric(value: number | undefined, strong: number, weak: number): number {
+  if (value === undefined) {
+    return 0.5;
+  }
+  if (value >= strong) {
+    return 1;
+  }
+  if (value <= weak) {
+    return 0;
+  }
+  return (value - weak) / Math.max(strong - weak, 0.0001);
+}
+
+function scoreNegativeMetric(value: number | undefined, strong: number, weak: number): number {
+  if (value === undefined) {
+    return 0.5;
+  }
+  if (value <= strong) {
+    return 1;
+  }
+  if (value >= weak) {
+    return 0;
+  }
+  return 1 - (value - strong) / Math.max(weak - strong, 0.0001);
+}
+
+function roundScore(score: number): number {
+  if (Number.isNaN(score)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function dedupe<T>(items: T[]): T[] {
+  return Array.from(new Set(items));
+}
+
+const PERIOD_MONTH_MAP: Record<HistoricalData['period'], number> = {
+  '1M': 1,
+  '3M': 3,
+  '6M': 6,
+  '1Y': 12,
+  '5Y': 60,
+};
+
+const TREND_THRESHOLD_MAP: Record<HistoricalData['period'], number> = {
+  '1M': 3,
+  '3M': 5,
+  '6M': 7,
+  '1Y': 10,
+  '5Y': 15,
+};
+
+const TRADING_DAYS_PER_YEAR = 252;
+
+function normalizeHistoricalPoints(data?: HistoricalData): HistoricalDataPoint[] {
+  if (!data?.dataPoints?.length) {
+    return [];
+  }
+
+  return [...data.dataPoints]
+    .filter((point) => typeof point?.price === 'number' && typeof point?.date === 'string')
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+function calculateSlope(points: HistoricalDataPoint[]): number {
+  if (points.length < 2) {
+    return 0;
+  }
+
+  const n = points.length;
+  const meanX = (n - 1) / 2;
+  const meanY = points.reduce((sum, point) => sum + point.price, 0) / n;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  for (let i = 0; i < n; i += 1) {
+    const x = i - meanX;
+    numerator += x * (points[i].price - meanY);
+    denominator += x * x;
+  }
+
+  if (denominator === 0) {
+    return 0;
+  }
+
+  return numerator / denominator;
+}
+
+/**
+ * Calculates simple and annualized price returns for the supplied historical series.
+ *
+ * @param data Historical price data
+ * @returns Period and annualized returns (percentage)
+ */
+export function calculateReturns(
+  data: HistoricalData
+): { period: number; annualized: number } {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return { period: 0, annualized: 0 };
+  }
+
+  const startPrice = points[0].price;
+  const endPrice = points[points.length - 1].price;
+
+  if (!startPrice || !endPrice || startPrice <= 0 || endPrice <= 0) {
+    return { period: 0, annualized: 0 };
+  }
+
+  const rawReturn = ((endPrice - startPrice) / startPrice) * 100;
+  const months = PERIOD_MONTH_MAP[data?.period ?? '6M'] ?? 6;
+  const years = months / 12;
+  const annualizedReturn =
+    years > 0 ? (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100 : 0;
+
+  return {
+    period: Number(rawReturn.toFixed(2)),
+    annualized: Number(annualizedReturn.toFixed(2)),
+  };
+}
+
+/**
+ * Estimates annualized volatility using daily price changes.
+ *
+ * @param data Historical price data
+ * @returns Annualized volatility percentage
+ */
+export function calculateVolatility(data: HistoricalData): number {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return 0;
+  }
+
+  const returns: number[] = [];
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1].price;
+    const curr = points[i].price;
+
+    if (!prev || !curr || prev <= 0 || curr <= 0) {
+      continue;
+    }
+
+    returns.push((curr - prev) / prev);
+  }
+
+  if (!returns.length) {
+    return 0;
+  }
+
+  const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+  const variance =
+    returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / returns.length;
+
+  const dailyStdDev = Math.sqrt(variance);
+  const annualized = dailyStdDev * Math.sqrt(TRADING_DAYS_PER_YEAR) * 100;
+  return Number(annualized.toFixed(2));
+}
+
+/**
+ * Detects the dominant price trend for the supplied series.
+ *
+ * @param data Historical price data
+ * @returns Trend classification
+ */
+export function detectTrend(
+  data: HistoricalData
+): 'uptrend' | 'downtrend' | 'sideways' {
+  const points = normalizeHistoricalPoints(data);
+  if (points.length < 2) {
+    return 'sideways';
+  }
+
+  const startPrice = points[0].price;
+  const endPrice = points[points.length - 1].price;
+
+  if (!startPrice || !endPrice || startPrice <= 0 || endPrice <= 0) {
+    return 'sideways';
+  }
+
+  const changePct = ((endPrice - startPrice) / startPrice) * 100;
+  const threshold = TREND_THRESHOLD_MAP[data?.period ?? '6M'] ?? 5;
+  const slope = calculateSlope(points);
+
+  let advances = 0;
+  let declines = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    if (points[i].price > points[i - 1].price) {
+      advances += 1;
+    } else if (points[i].price < points[i - 1].price) {
+      declines += 1;
+    }
+  }
+
+  const breadth = advances + declines > 0 ? advances / (advances + declines) : 0.5;
+
+  if (changePct >= threshold && slope > 0 && breadth >= 0.55) {
+    return 'uptrend';
+  }
+
+  if (changePct <= -threshold && slope < 0 && breadth <= 0.45) {
+    return 'downtrend';
+  }
+
+  return 'sideways';
+}
+
+const PEG_BUCKET_SCORES: Record<PegBucket, number> = {
+  discount: 1,
+  balanced: 0.7,
+  demanding: 0.25,
+  distorted: 0.45,
+};
+
+const GROWTH_SOURCE_TEXT: Record<GrowthSource, string> = {
+  eps: 'EPS growth',
+  revenue: 'revenue growth',
+};
+
+type GrowthMetricSelection = {
+  value: number;
+  source: GrowthSource;
+};
+
+function selectGrowthMetric(
+  fundamentals?: StockData['fundamentals']
+): GrowthMetricSelection | undefined {
+  if (!fundamentals) {
+    return undefined;
+  }
+
+  if (typeof fundamentals.epsGrowthYoYPct === 'number') {
+    return { value: fundamentals.epsGrowthYoYPct, source: 'eps' };
+  }
+
+  if (typeof fundamentals.revenueGrowthYoYPct === 'number') {
+    return { value: fundamentals.revenueGrowthYoYPct, source: 'revenue' };
+  }
+
+  return undefined;
+}
+
+function evaluatePegRatio(fundamentals?: StockData['fundamentals']): PegAssessment | undefined {
+  if (!fundamentals) {
+    return undefined;
+  }
+
+  const growthMetric = selectGrowthMetric(fundamentals);
+  if (!growthMetric) {
+    return undefined;
+  }
+
+  const { value: growth, source } = growthMetric;
+  const pe = fundamentals.forwardPE ?? fundamentals.trailingPE;
+
+  if (growth <= 0) {
+    return {
+      bucket: 'distorted',
+      normalizedGrowthPct: growth,
+      growthSource: source,
+      commentary: `${GROWTH_SOURCE_TEXT[source]} turned negative, so PEG loses meaning.`,
+    };
+  }
+
+  if (growth < 5) {
+    return {
+      bucket: 'distorted',
+      ratio: pe && growth > 0 ? pe / Math.max(growth, 0.1) : undefined,
+      normalizedGrowthPct: growth,
+      growthSource: source,
+      commentary: `${GROWTH_SOURCE_TEXT[source]} below 5% makes PEG less reliable.`,
+    };
+  }
+
+  if (!pe) {
+    return undefined;
+  }
+
+  const ratio = pe / growth;
+
+  let bucket: PegBucket = 'balanced';
+  let commentary = 'PEG indicates valuation is broadly aligned with growth.';
+
+  if (ratio <= 1) {
+    bucket = 'discount';
+    commentary = 'PEG below 1 suggests valuation is discounting future growth.';
+  } else if (ratio >= 1.8) {
+    bucket = 'demanding';
+    commentary =
+      ratio >= 3
+        ? 'PEG above 3 signals stretched multiples relative to growth.'
+        : 'PEG above 1.8 requires flawless execution to justify.';
+  }
+
+  return {
+    bucket,
+    ratio,
+    normalizedGrowthPct: growth,
+    growthSource: source,
+    commentary,
+  };
+}
+
+/**
+ * Calculates a 0-100 fundamentals quality score using weighted metrics.
+ *
+ * Weighting schema:
+ * - EPS growth: 25%
+ * - Net margin: 20%
+ * - Free cash flow yield: 20%
+ * - Return on equity: 15%
+ * - Revenue growth: 10%
+ * - Debt-to-equity (lower is better): 10%
+ *
+ * Missing metrics are treated as zero contribution.
+ *
+ * @param stock - Stock data containing fundamentals
+ * @returns Quality score from 0 (weak) to 100 (strong)
+ */
+export function calculateFundamentalsQualityScore(stock: StockData): number {
+  const fundamentals = stock?.fundamentals;
+  if (!fundamentals) {
+    return 0;
+  }
+
+  const weights = {
+    epsGrowth: 0.25,
+    netMargin: 0.2,
+    fcfYield: 0.2,
+    roe: 0.15,
+    revenueGrowth: 0.1,
+    debtToEquity: 0.1,
+  };
+
+  const epsScore =
+    fundamentals.epsGrowthYoYPct == null
+      ? 0
+      : scorePositiveMetric(fundamentals.epsGrowthYoYPct, 20, 0);
+  const marginScore =
+    fundamentals.netMarginPct == null
+      ? 0
+      : scorePositiveMetric(fundamentals.netMarginPct, 22, 5);
+  const fcfScore =
+    fundamentals.freeCashFlowYieldPct == null
+      ? 0
+      : scorePositiveMetric(fundamentals.freeCashFlowYieldPct, 5, 0.5);
+  const roeScore =
+    fundamentals.roe == null ? 0 : scorePositiveMetric(fundamentals.roe, 25, 8);
+  const revenueScore =
+    fundamentals.revenueGrowthYoYPct == null
+      ? 0
+      : scorePositiveMetric(fundamentals.revenueGrowthYoYPct, 12, -5);
+  const leverageScore =
+    fundamentals.debtToEquity == null
+      ? 0
+      : scoreNegativeMetric(fundamentals.debtToEquity, 0.8, 3);
+
+  const weightedTotal =
+    epsScore * weights.epsGrowth +
+    marginScore * weights.netMargin +
+    fcfScore * weights.fcfYield +
+    roeScore * weights.roe +
+    revenueScore * weights.revenueGrowth +
+    leverageScore * weights.debtToEquity;
+
+  return roundScore(weightedTotal * 100);
+}
+
+/**
+ * Builds a fundamentals insight with composite quality scoring.
+ */
+export function buildFundamentalsInsight(stock: StockData): FundamentalsInsight {
+  const fundamentals = stock?.fundamentals;
+  if (!fundamentals) {
+    return { ...DEFAULT_FUNDAMENTALS_INSIGHT };
+  }
+
+  const qualityScore = calculateFundamentalsQualityScore(stock);
+
+  let classification: FundamentalsClass = 'ok';
+  if (qualityScore >= 72) {
+    classification = 'strong';
+  }
+  if (qualityScore < 40) {
+    classification = 'weak';
+  }
+
+  const drivers: string[] = [];
+  if ((fundamentals.epsGrowthYoYPct ?? 0) >= 18) {
+    drivers.push('EPS growth is running above 18%');
+  }
+  if ((fundamentals.netMarginPct ?? 0) >= 22) {
+    drivers.push('Margins exceed 22%');
+  }
+  if ((fundamentals.freeCashFlowYieldPct ?? 0) >= 4) {
+    drivers.push('Free cash flow yield surpasses 4%');
+  }
+  if ((fundamentals.roe ?? 0) >= 25) {
+    drivers.push('ROE is north of 25%');
+  }
+  if ((fundamentals.revenueGrowthYoYPct ?? 0) >= 12) {
+    drivers.push('Revenue is compounding at double-digit rates');
+  }
+
+  const cautionaryNotes: string[] = [];
+  if ((fundamentals.debtToEquity ?? 0) > 2.5) {
+    cautionaryNotes.push('Leverage is elevated (debt-to-equity > 2.5x)');
+  }
+  if ((fundamentals.freeCashFlowYieldPct ?? 0) < 0.5) {
+    cautionaryNotes.push('Limited free cash flow support (< 0.5%)');
+  }
+  if ((fundamentals.epsGrowthYoYPct ?? 0) < 0) {
+    cautionaryNotes.push('Recent EPS trend turned negative');
+  }
+  if ((fundamentals.netMarginPct ?? 0) < 8) {
+    cautionaryNotes.push('Net margins are below 8%');
+  }
+
+  if (classification === 'strong' && cautionaryNotes.length > 0) {
+    classification = 'ok';
+  }
+
+  return {
+    classification,
+    qualityScore: roundScore(qualityScore),
+    drivers: drivers.slice(0, 3),
+    cautionaryNotes,
+  };
+}
+
+/**
+ * Builds a valuation insight that balances PEG, earnings yield, and cash flow.
+ */
+export function buildValuationInsight(stock: StockData): ValuationInsight {
+  const fundamentals = stock?.fundamentals;
+  if (!fundamentals) {
+    return { ...DEFAULT_VALUATION_INSIGHT };
+  }
+
+  const forwardPE = fundamentals.forwardPE ?? fundamentals.trailingPE;
+  const fallbackGrowth = fundamentals.epsGrowthYoYPct ?? fundamentals.revenueGrowthYoYPct;
+  const pegAssessment = evaluatePegRatio(fundamentals);
+  const peg =
+    pegAssessment?.ratio ??
+    (forwardPE && fallbackGrowth && fallbackGrowth > 0
+      ? forwardPE / Math.max(fallbackGrowth, 1)
+      : undefined);
+  const earningsYieldPct = forwardPE ? (1 / forwardPE) * 100 : undefined;
+  const fcfYield = fundamentals.freeCashFlowYieldPct;
+  const dividendYield = fundamentals.dividendYieldPct;
+
+  const weights = {
+    peg: 0.35,
+    earningsYield: 0.25,
+    fcfYield: 0.25,
+    dividend: 0.15,
+  };
+
+  let weightedScore = 0;
+  let totalWeight = 0;
+
+  const addScore = (
+    value: number | undefined,
+    scorer: (v: number | undefined, strong: number, weak: number) => number,
+    strong: number,
+    weak: number,
+    weight: number
+  ) => {
+    if (value === undefined) {
+      return;
+    }
+    weightedScore += scorer(value, strong, weak) * weight;
+    totalWeight += weight;
+  };
+
+  if (pegAssessment) {
+    weightedScore += PEG_BUCKET_SCORES[pegAssessment.bucket] * weights.peg;
+    totalWeight += weights.peg;
+  } else {
+    addScore(forwardPE, scoreNegativeMetric, 15, 35, weights.peg);
+  }
+  addScore(earningsYieldPct, scorePositiveMetric, 6, 2, weights.earningsYield);
+  addScore(fcfYield, scorePositiveMetric, 5, 1, weights.fcfYield);
+  addScore(dividendYield, scorePositiveMetric, 3, 0.2, weights.dividend);
+
+  if (totalWeight === 0) {
+    return { ...DEFAULT_VALUATION_INSIGHT };
+  }
+
+  const valuationScore = (weightedScore / totalWeight) * 100;
+
+  let classification: ValuationClass = 'fair';
+  if (valuationScore >= 65) {
+    classification = 'cheap';
+  }
+  if (valuationScore < 35) {
+    classification = 'rich';
+  }
+
+  let commentary = '';
+  if (classification === 'cheap') {
+    commentary = 'Multiples screen at a discount relative to growth and cash generation';
+  } else if (classification === 'rich') {
+    commentary = 'Premium multiples rely on sustained growth to be justified';
+  } else {
+    commentary = 'Valuation metrics look balanced versus growth profile';
+  }
+
+  const drivers: string[] = [];
+  const cautionaryNotes: string[] = [];
+
+  if (pegAssessment) {
+    if (pegAssessment.bucket === 'discount') {
+      drivers.push('PEG screens below 1x relative to growth inputs');
+    }
+    if (pegAssessment.bucket === 'balanced') {
+      drivers.push('PEG roughly aligned with growth trajectory');
+    }
+    if (pegAssessment.bucket === 'demanding') {
+      cautionaryNotes.push('Growth-adjusted PEG above 1.8x carries premium expectations');
+    }
+    if (pegAssessment.bucket === 'distorted') {
+      cautionaryNotes.push('PEG distorted because growth is limited or negative');
+    }
+
+    if (
+      pegAssessment.normalizedGrowthPct != null &&
+      pegAssessment.normalizedGrowthPct >= 20
+    ) {
+      const sourceLabel = pegAssessment.growthSource
+        ? GROWTH_SOURCE_TEXT[pegAssessment.growthSource]
+        : 'Growth';
+      drivers.push(`${sourceLabel} running near ${pegAssessment.normalizedGrowthPct.toFixed(0)}%`);
+    }
+  }
+
+  if (earningsYieldPct !== undefined) {
+    if (earningsYieldPct >= 6.5) {
+      drivers.push(`Earnings yield ${earningsYieldPct.toFixed(1)}% clears 6% hurdle`);
+    } else if (earningsYieldPct < 3) {
+      cautionaryNotes.push('Earnings yield below 3% offers thin cash support');
+    }
+  }
+
+  if (fcfYield !== undefined) {
+    if (fcfYield >= 5) {
+      drivers.push('Free cash flow yield exceeds 5%');
+    } else if (fcfYield < 1) {
+      cautionaryNotes.push('Free cash flow yield under 1% provides little downside protection');
+    }
+  }
+
+  if (dividendYield !== undefined && dividendYield >= 3) {
+    drivers.push('Dividend yield north of 3% adds income support');
+  }
+
+  if ((forwardPE ?? 0) >= 35) {
+    cautionaryNotes.push('Earnings multiples above 35x embed perfection');
+  }
+
+  const detailParts: string[] = [];
+  if (peg !== undefined) {
+    detailParts.push(`PEG ${peg.toFixed(2)}`);
+  }
+  if (pegAssessment?.commentary) {
+    detailParts.push(pegAssessment.commentary);
+  }
+  if (earningsYieldPct !== undefined) {
+    detailParts.push(`Earnings yield ${earningsYieldPct.toFixed(1)}%`);
+  }
+  if (fcfYield !== undefined) {
+    detailParts.push(`FCF yield ${fcfYield.toFixed(1)}%`);
+  }
+  if (dividendYield !== undefined) {
+    detailParts.push(`Dividend yield ${dividendYield.toFixed(2)}%`);
+  }
+
+  if (detailParts.length > 0) {
+    commentary = `${commentary} (${detailParts.join(' | ')})`;
+  }
+
+  const driverList = dedupe(drivers).slice(0, 3);
+  const cautionList = dedupe(cautionaryNotes).slice(0, 3);
+
+  return {
+    classification,
+    valuationScore: roundScore(valuationScore),
+    commentary,
+    pegRatio: peg,
+    pegAssessment,
+    earningsYieldPct,
+    freeCashFlowYieldPct: fcfYield,
+    dividendYieldPct: dividendYield,
+    drivers: driverList,
+    cautionaryNotes: cautionList,
+  };
+}
 
 /**
  * Classifies stock fundamentals as 'strong', 'ok', 'weak', or 'unknown'.
  * 
- * Classification criteria:
- * - **Strong**: EPS growth > 15%, net margin > 20%, FCF yield > 3%, ROE > 20%
- * - **Weak**: EPS growth < 5% AND net margin < 10%
- * - **OK**: Everything else (moderate fundamentals)
- * - **Unknown**: Missing fundamentals data
+ * Uses composite quality score with thresholds:
+ * - Strong: Score ≥ 70
+ * - OK: Score 40-69
+ * - Weak: Score < 40
+ * - Unknown: Missing data
  * 
  * @param stock - Stock data containing fundamentals
  * @returns Classification string indicating fundamentals strength
- * 
- * @example
- * ```typescript
- * const classification = classifyFundamentals({
- *   ticker: 'AAPL',
- *   fundamentals: { epsGrowthYoYPct: 20, netMarginPct: 25, ... }
- * });
- * // Returns: 'strong'
- * ```
  */
 export function classifyFundamentals(stock: StockData): 'strong' | 'ok' | 'weak' | 'unknown' {
-  const f = stock?.fundamentals;
-  if (!f) {
+  if (!stock?.fundamentals) {
     return 'unknown';
   }
-
-  const trailingPE = f?.trailingPE ?? 999;
-  const growth = f?.epsGrowthYoYPct ?? 0;
-  const margin = f?.netMarginPct ?? 0;
-  const fcfYield = f?.freeCashFlowYieldPct ?? 0;
-  const roe = f?.roe ?? 0;
-
-  // Strong: good growth, good margins, solid FCF
-  if (growth > 15 && margin > 20 && fcfYield > 3 && roe > 20) {
+  const score = calculateFundamentalsQualityScore(stock);
+  if (score >= 70) {
     return 'strong';
   }
-
-  // Weak: low growth, poor margins
-  if (growth < 5 && margin < 10) {
-    return 'weak';
+  if (score >= 40) {
+    return 'ok';
   }
-
-  return 'ok';
+  return 'weak';
 }
 
 /**
  * Classifies stock valuation as 'cheap', 'fair', 'rich', or 'unknown'.
  * 
- * Uses PEG ratio (Price/Earnings to Growth) as the primary metric:
- * - **Cheap**: PEG < 1.0 AND forward P/E < 20
- * - **Rich**: PEG > 2.5 OR forward P/E > 40
- * - **Fair**: Everything else (moderate valuation)
- * - **Unknown**: Missing valuation data
+ * Uses multi-factor valuation insight with composite scoring.
  * 
  * @param stock - Stock data containing fundamentals
  * @returns Classification string indicating valuation level
  */
 export function classifyValuation(stock: StockData): 'cheap' | 'fair' | 'rich' | 'unknown' {
-  const f = stock?.fundamentals;
-  if (!f) {
-    return 'unknown';
-  }
-
-  const trailingPE = f?.trailingPE ?? 999;
-  const forwardPE = f?.forwardPE ?? 999;
-  const growth = f?.epsGrowthYoYPct ?? 0;
-
-  // PEG ratio heuristic
-  const peg = forwardPE / Math.max(growth, 1);
-
-  if (peg < 1.0 && forwardPE < 20) {
-    return 'cheap';
-  }
-
-  if (peg > 2.5 || forwardPE > 40) {
-    return 'rich';
-  }
-
-  return 'fair';
+  return buildValuationInsight(stock).classification;
 }
 
 /**
@@ -437,16 +1017,22 @@ function generatePlanningGuidance(
 function generateSummary(
   user: UserProfile,
   stock: StockData,
-  fundamentalsClass: string,
-  valuationClass: string,
+  fundamentals: FundamentalsInsight,
+  valuation: ValuationInsight,
   technical: ReturnType<typeof analyzeTechnicals>,
   sentiment: ReturnType<typeof analyzeSentiment>
 ): AnalysisSummary {
   const ticker = stock?.ticker ?? 'UNKNOWN';
   const name = stock?.name ?? ticker;
 
+  const fundamentalsClass = fundamentals.classification;
+  const valuationClass = valuation.classification;
+
   // Headline
   let headlineView = `${name} (${ticker}) shows ${fundamentalsClass} fundamentals with ${valuationClass} valuation.`;
+  if (valuation.commentary && valuation.classification !== 'unknown') {
+    headlineView = `${headlineView} ${valuation.commentary}`;
+  }
 
   // Risk score (1-10)
   let riskScore = 5;
@@ -480,7 +1066,17 @@ function generateSummary(
   const keyTakeaways: string[] = [];
 
   keyTakeaways.push(`Fundamentals: ${fundamentalsClass}`);
+  keyTakeaways.push(`Quality score: ${fundamentals.qualityScore}/100`);
   keyTakeaways.push(`Valuation: ${valuationClass}`);
+  if (fundamentals.drivers.length > 0) {
+    keyTakeaways.push(`Key driver: ${fundamentals.drivers[0]}`);
+  }
+  if (fundamentals.cautionaryNotes.length > 0) {
+    keyTakeaways.push(`Watch list: ${fundamentals.cautionaryNotes[0]}`);
+  }
+  if (valuation.commentary) {
+    keyTakeaways.push(`Valuation context: ${valuation.commentary}`);
+  }
   keyTakeaways.push(`Technical trend: ${technical?.trend ?? 'neutral'}`);
   keyTakeaways.push(`Analyst consensus: ${sentiment?.consensusText ?? 'unknown'}`);
 
@@ -540,9 +1136,11 @@ export function analyzeStock(
 
   const horizonMonths = opts?.horizonMonths ?? 3;
 
-  // Classify fundamentals and valuation
-  const fundamentalsClass = classifyFundamentals(stock);
-  const valuationClass = classifyValuation(stock);
+  // Classify fundamentals and valuation with richer insight
+  const fundamentalsInsight = buildFundamentalsInsight(stock);
+  const valuationInsight = buildValuationInsight(stock);
+  const fundamentalsClass = fundamentalsInsight.classification;
+  const valuationClass = valuationInsight.classification;
 
   // Technical analysis
   const technical = analyzeTechnicals(stock);
@@ -560,15 +1158,15 @@ export function analyzeStock(
   const summary = generateSummary(
     user,
     stock,
-    fundamentalsClass,
-    valuationClass,
+    fundamentalsInsight,
+    valuationInsight,
     technical,
     sentiment
   );
 
   // Compose views
-  const fundamentalsView = composeFundamentalsView(stock, fundamentalsClass);
-  const valuationView = composeValuationView(stock, valuationClass);
+  const fundamentalsView = composeFundamentalsView(stock, fundamentalsInsight);
+  const valuationView = composeValuationView(stock, valuationInsight);
   const technicalView = composeTechnicalView(stock, technical);
   const sentimentView = composeSentimentView(sentiment);
 
@@ -586,13 +1184,15 @@ export function analyzeStock(
     sentimentView,
     scenarios,
     planningGuidance,
+    fundamentalsInsight,
+    valuationInsight,
     disclaimer,
     generatedAt: new Date().toISOString(),
   };
 }
 
 // Helper: compose fundamentals view
-function composeFundamentalsView(stock: StockData, classification: string): string {
+function composeFundamentalsView(stock: StockData, insight: FundamentalsInsight): string {
   const f = stock?.fundamentals;
   if (!f) {
     return 'Fundamentals data not available.';
@@ -600,7 +1200,16 @@ function composeFundamentalsView(stock: StockData, classification: string): stri
 
   const parts: string[] = [];
 
-  parts.push(`Classification: ${classification.toUpperCase()}`);
+  parts.push(`Classification: ${insight.classification.toUpperCase()}`);
+  if (insight.qualityScore > 0) {
+    parts.push(`Quality Score: ${insight.qualityScore}/100`);
+  }
+  if (insight.drivers.length > 0) {
+    parts.push(`Drivers: ${insight.drivers.join(', ')}`);
+  }
+  if (insight.cautionaryNotes.length > 0) {
+    parts.push(`Watch: ${insight.cautionaryNotes.join(', ')}`);
+  }
 
   if (f?.trailingPE) {
     parts.push(`Trailing P/E: ${f.trailingPE.toFixed(1)}`);
@@ -625,7 +1234,7 @@ function composeFundamentalsView(stock: StockData, classification: string): stri
 }
 
 // Helper: compose valuation view
-function composeValuationView(stock: StockData, classification: string): string {
+function composeValuationView(stock: StockData, insight: ValuationInsight): string {
   const f = stock?.fundamentals;
   if (!f) {
     return 'Valuation data not available.';
@@ -633,15 +1242,34 @@ function composeValuationView(stock: StockData, classification: string): string 
 
   const parts: string[] = [];
 
-  parts.push(`Classification: ${classification.toUpperCase()}`);
-
-  if (f?.forwardPE && f?.epsGrowthYoYPct) {
-    const peg = f.forwardPE / Math.max(f.epsGrowthYoYPct, 1);
-    parts.push(`PEG Ratio: ${peg.toFixed(2)}`);
+  parts.push(`Classification: ${insight.classification.toUpperCase()}`);
+  if (insight.valuationScore > 0) {
+    parts.push(`Composite Score: ${insight.valuationScore}/100`);
+  }
+  if (insight.commentary) {
+    parts.push(`Notes: ${insight.commentary}`);
+  }
+  if (insight.drivers && insight.drivers.length > 0) {
+    parts.push(`Drivers: ${insight.drivers.join(', ')}`);
+  }
+  if (insight.cautionaryNotes && insight.cautionaryNotes.length > 0) {
+    parts.push(`Watch: ${insight.cautionaryNotes.join(', ')}`);
   }
 
-  if (f?.dividendYieldPct !== undefined) {
-    parts.push(`Dividend Yield: ${f.dividendYieldPct.toFixed(2)}%`);
+  if (insight.pegRatio !== undefined) {
+    parts.push(`PEG Ratio: ${insight.pegRatio.toFixed(2)}`);
+  }
+
+  if (insight.earningsYieldPct !== undefined) {
+    parts.push(`Earnings Yield: ${insight.earningsYieldPct.toFixed(1)}%`);
+  }
+
+  if (insight.freeCashFlowYieldPct !== undefined) {
+    parts.push(`FCF Yield: ${insight.freeCashFlowYieldPct.toFixed(1)}%`);
+  }
+
+  if (insight.dividendYieldPct !== undefined) {
+    parts.push(`Dividend Yield: ${insight.dividendYieldPct.toFixed(2)}%`);
   }
 
   return parts.join(' | ');

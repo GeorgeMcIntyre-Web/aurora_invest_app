@@ -1,9 +1,24 @@
 // Core type definitions for AuroraInvest Stock Analyzer
 
+import type { PortfolioAction, PortfolioHolding, PortfolioMetrics } from './portfolioEngine';
+
 export type RiskTolerance = 'low' | 'moderate' | 'high';
 export type InvestmentHorizon = '1-3' | '5-10' | '10+';
 export type InvestmentObjective = 'growth' | 'income' | 'balanced';
 export type AnalystConsensus = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
+export type FundamentalsClassification = 'strong' | 'ok' | 'weak' | 'unknown';
+export type ValuationClassification = 'cheap' | 'fair' | 'rich' | 'unknown';
+export type PegBucket = 'discount' | 'balanced' | 'demanding' | 'distorted';
+
+export type GrowthSource = 'eps' | 'revenue';
+
+export interface PegAssessment {
+  bucket: PegBucket;
+  ratio?: number;
+  normalizedGrowthPct?: number;
+  growthSource?: GrowthSource;
+  commentary: string;
+}
 
 export interface UserProfile {
   riskTolerance: RiskTolerance;
@@ -41,6 +56,26 @@ export interface StockSentiment {
   analystTargetHigh?: number;
   analystTargetLow?: number;
   newsThemes: string[];
+}
+
+export interface FundamentalsInsight {
+  classification: FundamentalsClassification;
+  qualityScore: number;
+  drivers: string[];
+  cautionaryNotes: string[];
+}
+
+export interface ValuationInsight {
+  classification: ValuationClassification;
+  valuationScore: number;
+  commentary: string;
+  drivers: string[];
+  cautionaryNotes: string[];
+  pegRatio?: number;
+  pegAssessment?: PegAssessment;
+  earningsYieldPct?: number;
+  freeCashFlowYieldPct?: number;
+  dividendYieldPct?: number;
 }
 
 export interface StockData {
@@ -91,10 +126,97 @@ export interface AnalysisResult {
   sentimentView: string;
   scenarios: ScenarioSummary;
   planningGuidance: PlanningGuidance;
+  fundamentalsInsight?: FundamentalsInsight;
+  valuationInsight?: ValuationInsight;
   disclaimer: string;
   generatedAt: string;
 }
 
 export interface AnalysisOptions {
   horizonMonths?: number;
+}
+
+export interface HistoricalDataPoint {
+  date: string; // ISO date
+  price: number;
+  volume: number;
+}
+
+export interface HistoricalData {
+  ticker: string;
+  period: '1M' | '3M' | '6M' | '1Y' | '5Y';
+  dataPoints: HistoricalDataPoint[];
+}
+
+export type PortfolioActionSuggestion = PortfolioAction;
+
+export interface PortfolioContext {
+  portfolioId: string;
+  existingHolding?: PortfolioHolding;
+  portfolioMetrics: PortfolioMetrics;
+  suggestedAction: PortfolioActionSuggestion;
+  reasoning: string[];
+}
+
+// Tooltip Engine Types
+export type FinancialTerm =
+  // Valuation metrics
+  | 'pe_ratio'
+  | 'forward_pe'
+  | 'peg_ratio'
+  | 'earnings_yield'
+  | 'price_to_book'
+  | 'price_to_sales'
+  // Growth metrics
+  | 'eps_growth'
+  | 'revenue_growth'
+  | 'dividend_yield'
+  // Profitability metrics
+  | 'net_margin'
+  | 'operating_margin'
+  | 'roe'
+  | 'roa'
+  | 'roic'
+  // Liquidity & Solvency
+  | 'debt_to_equity'
+  | 'current_ratio'
+  | 'quick_ratio'
+  | 'free_cash_flow'
+  | 'fcf_yield'
+  // Technical indicators
+  | 'rsi'
+  | 'sma_20'
+  | 'sma_50'
+  | 'sma_200'
+  | 'volume'
+  | 'beta'
+  | 'volatility'
+  | '52w_high'
+  | '52w_low'
+  // Sentiment & Analysis
+  | 'analyst_consensus'
+  | 'price_target'
+  | 'risk_score'
+  | 'conviction_score'
+  // Portfolio metrics
+  | 'portfolio_allocation'
+  | 'concentration_risk'
+  | 'portfolio_beta'
+  | 'portfolio_volatility'
+  | 'cost_basis'
+  | 'unrealized_gain'
+  // Scenario analysis
+  | 'bull_scenario'
+  | 'base_scenario'
+  | 'bear_scenario'
+  | 'expected_return';
+
+export interface TooltipContent {
+  term: FinancialTerm;
+  title: string;
+  definition: string;
+  interpretation: string;
+  example?: string;
+  formula?: string;
+  category: 'valuation' | 'growth' | 'profitability' | 'liquidity' | 'technical' | 'sentiment' | 'portfolio' | 'scenario';
 }

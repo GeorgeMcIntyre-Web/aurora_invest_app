@@ -1,0 +1,116 @@
+import {
+  MockMarketDataService,
+  createMarketDataService,
+  marketDataService,
+} from '../marketDataService';
+import { MOCK_STOCK_DATA } from '../../data/mockData';
+
+describe('MockMarketDataService', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('resolves with mock data for supported tickers after the simulated delay', async () => {
+    vi.useFakeTimers();
+    const service = new MockMarketDataService();
+
+    const resultPromise = service.fetchStockData('AAPL');
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.AAPL);
+  });
+
+  it('accepts lowercase tickers by relying on mock data normalization', async () => {
+    vi.useFakeTimers();
+    const service = new MockMarketDataService();
+
+    const resultPromise = service.fetchStockData('msft');
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.MSFT);
+  });
+
+  it('throws a validation error when no ticker is provided', async () => {
+    const service = new MockMarketDataService();
+    await expect(service.fetchStockData('')).rejects.toThrow('Ticker is required');
+  });
+
+  it('throws a descriptive error when the ticker is not found', async () => {
+    vi.useFakeTimers();
+    const service = new MockMarketDataService();
+
+    const expectation = expect(service.fetchStockData('XYZ')).rejects.toThrow(
+      'Stock data not found for ticker: XYZ'
+    );
+    await vi.runAllTimersAsync();
+    await expectation;
+  });
+
+  it('waits 500ms before resolving to mirror API latency', async () => {
+    vi.useFakeTimers();
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const service = new MockMarketDataService();
+
+    const resultPromise = service.fetchStockData('NVDA');
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 500);
+
+    await vi.runAllTimersAsync();
+    await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.NVDA);
+  });
+
+  it('returns synthetic historical data with deterministic pricing', async () => {
+    vi.useFakeTimers();
+    const service = new MockMarketDataService();
+
+    const resultPromise = service.fetchHistoricalData('AAPL', '3M');
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.ticker).toBe('AAPL');
+    expect(result.period).toBe('3M');
+    expect(result.dataPoints.length).toBeGreaterThan(40);
+    expect(result.dataPoints[0].price).toBeGreaterThan(0);
+    expect(result.dataPoints[result.dataPoints.length - 1].price).toBeGreaterThan(0);
+  });
+
+  it('rejects when requesting historical data with an empty ticker', async () => {
+    const service = new MockMarketDataService();
+    await expect(service.fetchHistoricalData('', '1M')).rejects.toThrow('Ticker is required');
+  });
+});
+
+describe('createMarketDataService', () => {
+  it('returns fresh MockMarketDataService instances', () => {
+    const first = createMarketDataService();
+    const second = createMarketDataService();
+
+    expect(first).toBeInstanceOf(MockMarketDataService);
+    expect(second).toBeInstanceOf(MockMarketDataService);
+    expect(first).not.toBe(second);
+  });
+});
+
+describe('marketDataService singleton', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is ready for use and returns mock stock data', async () => {
+    vi.useFakeTimers();
+    const resultPromise = marketDataService.fetchStockData('GOOGL');
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toEqual(MOCK_STOCK_DATA.GOOGL);
+  });
+
+  it('supports historical data on the default singleton', async () => {
+    vi.useFakeTimers();
+    const resultPromise = marketDataService.fetchHistoricalData('MSFT', '1M');
+    await vi.runAllTimersAsync();
+
+    const result = await resultPromise;
+    expect(result.ticker).toBe('MSFT');
+    expect(result.dataPoints.length).toBeGreaterThan(10);
+  });
+});
