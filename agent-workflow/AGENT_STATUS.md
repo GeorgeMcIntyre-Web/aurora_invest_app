@@ -102,11 +102,37 @@ Successfully implemented hover-based financial tooltips across all analytics das
 
 ---
 
+## Issue #24 – Active Manager Recommendation Engine
+
+**Status:** 🟡 **In progress (Agent 2 — Domain Engine)**
+
+**Branch:** `cursor/create-active-manager-recommendation-module-gpt-5.1-codex-high-d6be`
+
+### Summary
+
+- Added new pure domain module `lib/domain/activeManagerEngine.ts` that synthesizes active manager recommendations from analysis summaries, scenarios, and optional portfolio context.
+- Extended `lib/domain/AnalysisTypes.ts` with `ActiveManagerRecommendation`, horizon aliases, and richer `PortfolioContext` metadata (`positionWeightPct` + unified action type).
+- Introduced minimal Vitest coverage in `lib/domain/__tests__/activeManagerEngine.test.ts` (4 tests) to exercise guard clauses, high-conviction buys, risk guardrails, and portfolio-context-driven trims.
+
+### Build & Test Snapshot (2025-12-05)
+
+- `npm run build` → **SUCCESS** (Next.js 14.2.28). Note: existing `metadataBase` warnings persist and were observed before this change.
+- `npx vitest run lib/domain/__tests__/activeManagerEngine.test.ts` → **PASS** (1 file, 4 tests).
+
+### TODOs / Follow-ups (handoff to Agent 5 & Domain QA)
+
+1. Expand unit coverage for additional edge cases (missing scenarios, negative expected returns, null portfolio context) once orchestration layer wires the module.
+2. Integrate the new engine output into the UI/contract layer when portfolio context fetching is implemented.
+3. Consider persisting explicit `positionWeightPct` from the portfolio service so guardrails avoid cost-basis fallbacks.
+
+---
+
 ## Pipeline Status Summary
 
 | Issue | Feature | Status | Branch | Tests | Notes |
 |-------|---------|--------|--------|-------|-------|
 | #17 | Hover-based Financial Tooltips | ✅ Merged | `feature/hover-tooltips-financial-analytics` | 81/81 passing | Pure domain engine + UI components |
+| #24 | Active Manager Recommendation Engine | 🟡 In progress | `cursor/create-active-manager-recommendation-module-gpt-5.1-codex-high-d6be` | Domain unit tests: 4/4 | New domain module + types + scaffolding |
 
 ---
 
