@@ -11,8 +11,11 @@ import {
   StockData,
   HistoricalData,
   PortfolioContext,
+  ActiveManagerRecommendation,
+  ActiveManagerInput,
 } from '@/lib/domain/AnalysisTypes';
 import { analyzeStock } from '@/lib/domain/auroraEngine';
+import { buildActiveManagerRecommendation } from '@/lib/domain/activeManagerEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
 // Portfolio imports - temporarily disabled until service methods are implemented
 // import {
@@ -318,6 +321,9 @@ export default function Home() {
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [quickAddPending, setQuickAddPending] = useState(false);
+  const [activeManagerRecommendation, setActiveManagerRecommendation] = useState<ActiveManagerRecommendation | null>(null);
+  const [activeManagerLoading, setActiveManagerLoading] = useState(false);
+  const [activeManagerError, setActiveManagerError] = useState<string | null>(null);
 
   const loadPortfolioContext = useCallback(
     async (_ticker: string, _fallbackPrice = 0) => {
@@ -470,6 +476,27 @@ export default function Home() {
 
       setStock(stockData);
       setResult(analysisResult);
+
+      // Generate Active Manager recommendation
+      setActiveManagerLoading(true);
+      setActiveManagerError(null);
+      try {
+        const activeManagerInput: ActiveManagerInput = {
+          ticker: request.ticker,
+          analysisResult,
+          userProfile: request.profile,
+          // Portfolio context will be added later when portfolio integration is complete
+          portfolioContext: undefined,
+        };
+        const recommendation = buildActiveManagerRecommendation(activeManagerInput);
+        setActiveManagerRecommendation(recommendation);
+      } catch (err) {
+        console.error('Active Manager generation failed:', err);
+        setActiveManagerError('Unable to generate recommendation.');
+      } finally {
+        setActiveManagerLoading(false);
+      }
+
       persistToCache(request.cacheKey, { stock: stockData, result: analysisResult });
       await loadPortfolioContext(request.ticker, stockData?.technicals?.price ?? 0);
     } catch (err) {
@@ -826,6 +853,9 @@ export default function Home() {
                 portfolioError={portfolioError}
                 onQuickAddHolding={handleQuickAddHolding}
                 quickAddBusy={quickAddPending}
+                activeManagerRecommendation={activeManagerRecommendation}
+                activeManagerLoading={activeManagerLoading}
+                activeManagerError={activeManagerError}
               />
             )}
           </div>
