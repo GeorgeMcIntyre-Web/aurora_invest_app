@@ -116,6 +116,17 @@ export interface PlanningGuidance {
   languageNotes: string;
 }
 
+export type ActiveManagerAction = 'BUY' | 'HOLD' | 'TRIM' | 'SELL';
+
+export interface ActiveManagerRecommendation {
+  primaryAction: ActiveManagerAction;
+  confidenceScore: number;
+  headline: string;
+  rationale: string[];
+  riskFlags: string[];
+  frameworkNote?: string;
+}
+
 export interface AnalysisResult {
   ticker: string;
   name?: string;
@@ -130,6 +141,7 @@ export interface AnalysisResult {
   valuationInsight?: ValuationInsight;
   disclaimer: string;
   generatedAt: string;
+  activeManagerRecommendation?: ActiveManagerRecommendation | null;
 }
 
 export interface AnalysisOptions {

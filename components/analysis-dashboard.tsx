@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
-import { AnalysisResult, StockData, HistoricalData, PortfolioContext } from '@/lib/domain/AnalysisTypes';
+import {
+  ActiveManagerRecommendation,
+  AnalysisResult,
+  HistoricalData,
+  PortfolioContext,
+  StockData,
+} from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
@@ -18,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { FinancialTooltip } from './financial-tooltip';
 import { cn } from '@/lib/utils';
+import { ActiveManagerCard } from './active-manager-card';
 
 type HistoricalPeriod = HistoricalData['period'];
 
@@ -34,6 +41,9 @@ interface AnalysisDashboardProps {
   portfolioError?: string | null;
   onQuickAddHolding?: (input: { shares: number; averageCostBasis: number; purchaseDate: string }) => Promise<void>;
   quickAddBusy?: boolean;
+  activeManagerRecommendation?: ActiveManagerRecommendation | null;
+  activeManagerLoading?: boolean;
+  activeManagerError?: string | null;
 }
 
 export function AnalysisDashboard({
@@ -49,6 +59,9 @@ export function AnalysisDashboard({
   portfolioError = null,
   onQuickAddHolding,
   quickAddBusy = false,
+  activeManagerRecommendation = null,
+  activeManagerLoading = false,
+  activeManagerError = null,
 }: AnalysisDashboardProps) {
   if (!result) {
     return null;
@@ -356,6 +369,12 @@ export function AnalysisDashboard({
           )}
         </div>
       </div>
+
+      <ActiveManagerCard
+        recommendation={activeManagerRecommendation ?? null}
+        isLoading={activeManagerLoading}
+        error={activeManagerError}
+      />
 
       {/* Disclaimer */}
       <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6">
