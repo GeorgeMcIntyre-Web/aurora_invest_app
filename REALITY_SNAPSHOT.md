@@ -92,3 +92,4 @@ npm test               # Test status (after npm install)
 
 **Remember**: Ground truth over narrative. Always run actual commands.
 
+

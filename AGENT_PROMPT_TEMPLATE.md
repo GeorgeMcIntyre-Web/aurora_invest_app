@@ -186,3 +186,4 @@ Tests: [npm test → X tests, Y passed/failed]
 
 **Ready to start? Read your specific section in `AGENT_PROMPTS.md` and begin with a reality snapshot.**
 
+

@@ -44,3 +44,9 @@ next-env.d.ts
 *.swo
 *~
 
+# Temporary image files from Cursor/IDE
+assets/*.png
+assets/*.jpg
+assets/*.jpeg
+assets/*.gif
+

@@ -560,3 +560,4 @@ Begin by running the reality check commands and providing your initial reality s
 - No dependencies on other documentation files
 - Agents must provide reality snapshots with actual command outputs
 
+

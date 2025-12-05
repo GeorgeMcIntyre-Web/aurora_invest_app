@@ -120,3 +120,4 @@ Your specific instructions are in AGENT_PROMPTS.md → "Agent 6: Full-Stack Feat
 
 **Note:** The full constraints and rules sections are in `AGENT_PROMPT_TEMPLATE.md`. You can reference that file or copy the sections when giving prompts to agents.
 
+

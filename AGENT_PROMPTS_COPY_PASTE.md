@@ -240,3 +240,4 @@ Your specific instructions: AGENT_PROMPTS.md → "Agent 6: Full-Stack Feature De
 
 **Usage:** Copy the prompt for the agent you're assigning and paste it directly. Each prompt is self-contained and ready to use.
 
+

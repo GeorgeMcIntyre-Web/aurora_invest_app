@@ -270,6 +270,13 @@ export function AnalysisDashboard({
           )}
         </div>
 
+        {/* Active Manager Recommendation - Moved to top for visibility */}
+        <ActiveManagerCard
+          recommendation={activeManagerRecommendation ?? null}
+          loading={activeManagerLoading}
+          error={activeManagerError}
+        />
+
       {(portfolioLoading || portfolioContext || portfolioError) && (
         <div className="bg-ai-card border border-gray-700 rounded-lg p-6 space-y-4">
           <div className="flex items-center gap-3">
@@ -440,13 +447,6 @@ export function AnalysisDashboard({
           )}
         </div>
       </div>
-
-      {/* Active Manager Recommendation */}
-      <ActiveManagerCard
-        recommendation={activeManagerRecommendation ?? null}
-        loading={activeManagerLoading}
-        error={activeManagerError}
-      />
 
       {/* Disclaimer */}
       <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6">

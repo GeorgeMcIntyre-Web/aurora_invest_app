@@ -52,7 +52,19 @@ export function ActiveManagerCard({
   }
 
   if (!recommendation) {
-    return null;
+    return (
+      <div className="bg-ai-card border border-gray-700 rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Target className="h-6 w-6 text-ai-primary" />
+          <h3 className="text-lg font-semibold text-ai-text">
+            Active Manager Recommendation
+          </h3>
+        </div>
+        <p className="text-sm text-ai-muted">
+          Run an analysis to see Active Manager recommendations for this stock.
+        </p>
+      </div>
+    );
   }
 
   const getActionIcon = () => {
