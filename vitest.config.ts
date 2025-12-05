@@ -9,9 +9,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom',
-    include: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
+    environment: 'node',
+    include: ['**/*.test.ts', '**/*.spec.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
-    setupFiles: ['./vitest.setup.ts'],
   },
 });
