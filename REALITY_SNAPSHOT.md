@@ -92,3 +92,12 @@ npm test               # Test status (after npm install)
 
 **Remember**: Ground truth over narrative. Always run actual commands.
 
+## Active Manager Reality – 2025-12-05
+
+- **Branch**: `cursor/setup-active-manager-contracts-and-reality-snapshot-gpt-5.1-codex-high-a4c9` with local edits to `lib/domain/AnalysisTypes.ts` plus new workflow contracts (`agent-workflow/GLOBAL_RULES.md`, `agent-workflow/contracts/ActiveManagerContracts.ts`).
+- **Types (`AnalysisTypes.ts`)**: Now exports `ActiveManagerTimeframe` and `ActiveManagerRecommendation` which reuse the existing `PortfolioAction` type from `lib/domain/portfolioEngine.ts`. These additions do not change other exports or consumers yet.
+- **Domain Engine (`auroraEngine.ts`)**: No Active Manager hooks exist today; engine remains pure analytics and compiles cleanly after the new type exports (verified via `npm run build`).
+- **Portfolio Types**: `PortfolioAction`, `PortfolioActionSuggestion`, and `PortfolioContext` continue to live in `portfolioEngine.ts`/`AnalysisTypes.ts`, and are re-exported for Active Manager consumers through `agent-workflow/contracts/ActiveManagerContracts.ts`.
+- **Build**: `npm run build` (Next.js 14.2.28) succeeds. Only known warning is the pre-existing `metadataBase` notice from Next.js metadata generation; no TypeScript errors.
+- **Tests**: `npm test` (Vitest) executes 5 suites / 81 tests and passes. No skipped suites or “No test suite found” issues observed; this reflects the pre-feature baseline.
+
