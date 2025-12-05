@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ShieldAlert, Activity, Droplet, AlertOctagon } from 'lucide-react';
 import { AnalysisResult, StockData } from '@/lib/domain/AnalysisTypes';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
