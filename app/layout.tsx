@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('http://localhost:3000'),
   title: "AuroraInvest Stock Analyzer | Investment Analysis Tool",
   description: "Professional stock analysis tool providing comprehensive insights including fundamentals, technicals, sentiment analysis, and scenario projections for informed investment decisions.",
   icons: {

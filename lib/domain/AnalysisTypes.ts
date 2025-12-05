@@ -130,6 +130,8 @@ export interface AnalysisResult {
   valuationInsight?: ValuationInsight;
   disclaimer: string;
   generatedAt: string;
+  aiInsights?: string;
+  aiReasoning?: string;
 }
 
 export interface AnalysisOptions {
