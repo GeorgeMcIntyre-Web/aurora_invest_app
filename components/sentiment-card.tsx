@@ -1,8 +1,9 @@
 'use client';
 
-import { MessageSquare, Target, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
+import { MessageSquare, Target, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { StockData } from '@/lib/domain/AnalysisTypes';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FinancialTooltip } from './financial-tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 interface SentimentCardProps {
   stock: StockData;
@@ -63,17 +64,9 @@ export function SentimentCard({ stock, sentimentView }: SentimentCardProps) {
           {/* Analyst Consensus */}
           <div className="bg-ai-bg p-4 rounded-lg">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
+              <FinancialTooltip term="analystConsensus">
                 <div className="text-sm text-ai-muted">Analyst Consensus</div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-[220px] text-xs">Aggregated recommendation from professional analysts covering this stock. Ranges from Strong Buy to Strong Sell.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+              </FinancialTooltip>
               <ConsensusIcon className={`h-5 w-5 ${consensus?.color}`} />
             </div>
             <div className={`text-2xl font-bold ${consensus?.color}`}>
@@ -82,36 +75,29 @@ export function SentimentCard({ stock, sentimentView }: SentimentCardProps) {
           </div>
 
           {/* Price Targets */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="text-sm text-ai-muted">Analyst Price Targets</div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-[220px] text-xs">12-month price targets from professional analysts. The mean target represents the average expectation.</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-ai-bg p-3 rounded-lg">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-ai-bg p-3 rounded-lg">
+              <FinancialTooltip term="priceTarget">
                 <div className="text-xs text-ai-muted">Low Target</div>
-                <div className="text-lg font-semibold text-ai-text mt-1">
-                  ${s?.analystTargetLow?.toFixed?.(2) ?? 'N/A'}
-                </div>
+              </FinancialTooltip>
+              <div className="text-lg font-semibold text-ai-text mt-1">
+                ${s?.analystTargetLow?.toFixed?.(2) ?? 'N/A'}
               </div>
-              <div className="bg-ai-bg p-3 rounded-lg border-2 border-ai-primary">
+            </div>
+            <div className="bg-ai-bg p-3 rounded-lg border-2 border-ai-primary">
+              <FinancialTooltip term="priceTarget">
                 <div className="text-xs text-ai-muted">Mean Target</div>
-                <div className="text-lg font-semibold text-ai-text mt-1">
-                  ${s?.analystTargetMean?.toFixed?.(2) ?? 'N/A'}
-                </div>
+              </FinancialTooltip>
+              <div className="text-lg font-semibold text-ai-text mt-1">
+                ${s?.analystTargetMean?.toFixed?.(2) ?? 'N/A'}
               </div>
-              <div className="bg-ai-bg p-3 rounded-lg">
+            </div>
+            <div className="bg-ai-bg p-3 rounded-lg">
+              <FinancialTooltip term="priceTarget">
                 <div className="text-xs text-ai-muted">High Target</div>
-                <div className="text-lg font-semibold text-ai-text mt-1">
-                  ${s?.analystTargetHigh?.toFixed?.(2) ?? 'N/A'}
-                </div>
+              </FinancialTooltip>
+              <div className="text-lg font-semibold text-ai-text mt-1">
+                ${s?.analystTargetHigh?.toFixed?.(2) ?? 'N/A'}
               </div>
             </div>
           </div>
@@ -121,15 +107,9 @@ export function SentimentCard({ stock, sentimentView }: SentimentCardProps) {
             <div className="bg-ai-bg p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="h-4 w-4 text-ai-accent" />
-                <div className="text-sm text-ai-muted">Implied Upside to Mean Target</div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-[220px] text-xs">Percentage difference between current price and analyst mean target. Positive values suggest potential upside.</p>
-                  </TooltipContent>
-                </Tooltip>
+                <FinancialTooltip term="impliedUpside">
+                  <div className="text-sm text-ai-muted">Implied Upside to Mean Target</div>
+                </FinancialTooltip>
               </div>
               <div className={`text-3xl font-bold ${
                 upside > 0 ? 'text-ai-accent' : 'text-red-500'
@@ -139,20 +119,20 @@ export function SentimentCard({ stock, sentimentView }: SentimentCardProps) {
             </div>
           )}
 
-          {/* News Themes */}
-          {s?.newsThemes && s?.newsThemes?.length > 0 && (
-            <div>
-              <div className="text-sm text-ai-muted mb-3">Key News Themes</div>
-              <ul className="space-y-2">
-                {s.newsThemes.slice(0, 4).map((theme, index) => (
-                  <li key={index} className="text-sm text-ai-text bg-ai-bg p-3 rounded-lg flex items-start gap-2">
-                    <span className="text-ai-accent mt-0.5">•</span>
-                    <span>{theme}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+        {/* News Themes */}
+        {s?.newsThemes && s?.newsThemes?.length > 0 && (
+          <div>
+            <div className="text-sm text-ai-muted mb-3">Key News Themes</div>
+            <ul className="space-y-2">
+              {s.newsThemes.slice(0, 4).map((theme, index) => (
+                <li key={index} className="text-sm text-ai-text bg-ai-bg p-3 rounded-lg flex items-start gap-2">
+                  <span className="text-ai-accent mt-0.5">•</span>
+                  <span>{theme}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         </div>
       </div>
     </TooltipProvider>

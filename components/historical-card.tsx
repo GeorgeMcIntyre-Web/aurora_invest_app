@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Activity, TrendingDown, TrendingUp, Info } from 'lucide-react';
+import { Activity, TrendingDown, TrendingUp } from 'lucide-react';
 import { HistoricalData } from '@/lib/domain/AnalysisTypes';
 import { calculateReturns, calculateVolatility, detectTrend } from '@/lib/domain/auroraEngine';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FinancialTooltip } from './financial-tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 type HistoricalPeriod = HistoricalData['period'];
 
@@ -101,10 +102,12 @@ export function HistoricalCard({ data, selectedPeriod, isLoading = false }: Hist
             <p className="text-lg text-ai-text font-semibold">{PERIOD_LABEL[selectedPeriod]}</p>
           </div>
           {trendMeta && (
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${trendMeta.className}`}>
-              <trendMeta.icon className="h-4 w-4" />
-              <span>{trendMeta.label}</span>
-            </div>
+            <FinancialTooltip term="trend">
+              <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${trendMeta.className}`}>
+                <trendMeta.icon className="h-4 w-4" />
+                <span>{trendMeta.label}</span>
+              </div>
+            </FinancialTooltip>
           )}
         </div>
 
@@ -118,64 +121,40 @@ export function HistoricalCard({ data, selectedPeriod, isLoading = false }: Hist
           <>
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-lg border border-gray-700 bg-ai-bg p-4">
-                <div className="flex items-center justify-between">
+                <FinancialTooltip term="returns">
                   <p className="text-xs uppercase text-ai-muted tracking-wide">Period Return</p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-[220px] text-xs">Total percentage change in price over the selected time period. Does not account for compounding.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+                </FinancialTooltip>
                 <p className="mt-2 text-2xl font-semibold text-ai-text">{formatPercent(summary.periodReturn)}</p>
                 <p className="text-xs text-ai-muted mt-1">Change over {PERIOD_LABEL[selectedPeriod]}</p>
               </div>
               <div className="rounded-lg border border-gray-700 bg-ai-bg p-4">
-                <div className="flex items-center justify-between">
+                <FinancialTooltip term="annualizedReturns">
                   <p className="text-xs uppercase text-ai-muted tracking-wide">Annualized Return</p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-[220px] text-xs">Return normalized to a 12-month period with compounding. Useful for comparing different time periods.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+                </FinancialTooltip>
                 <p className="mt-2 text-2xl font-semibold text-ai-text">{formatPercent(summary.annualizedReturn)}</p>
                 <p className="text-xs text-ai-muted mt-1">Assumes compounding</p>
               </div>
               <div className="rounded-lg border border-gray-700 bg-ai-bg p-4">
-                <div className="flex items-center justify-between">
+                <FinancialTooltip term="historicalVolatility">
                   <p className="text-xs uppercase text-ai-muted tracking-wide">Volatility</p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-ai-muted hover:text-ai-primary cursor-help transition-colors" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-[220px] text-xs">Annualized standard deviation of returns. Higher volatility means larger price swings and increased risk.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+                </FinancialTooltip>
                 <p className="mt-2 text-2xl font-semibold text-ai-text">{summary.volatility.toFixed(1)}%</p>
                 <p className="text-xs text-ai-muted mt-1">{volatilityLabel}</p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-gray-700 bg-ai-bg p-5">
-              <p className="text-sm font-semibold text-ai-text mb-3">Key Observations</p>
-              <ul className="space-y-2">
-                {observations.map((item, index) => (
-                  <li key={index} className="flex gap-2 text-sm text-ai-text">
-                    <span className="text-ai-accent">•</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
+          <div className="mt-6 rounded-lg border border-gray-700 bg-ai-bg p-5">
+            <p className="text-sm font-semibold text-ai-text mb-3">Key Observations</p>
+            <ul className="space-y-2">
+              {observations.map((item, index) => (
+                <li key={index} className="flex gap-2 text-sm text-ai-text">
+                  <span className="text-ai-accent">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
         )}
       </div>
     </TooltipProvider>
