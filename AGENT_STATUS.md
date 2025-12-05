@@ -161,6 +161,22 @@ Tests: ✅ 21 tests passed (2 test files)
 Build: ✅ PASSING
 ```
 
+### Agent 5 – Active Manager Engine Tests (2025-12-05)
+
+**Branch:** `cursor/test-active-manager-engine-logic-gpt-5.1-codex-high-df05`
+
+**Coverage added today:**
+- ✅ Returns null when analysis payload or ticker is absent
+- ✅ Respects `suggestPortfolioAction` guidance for ≥40% overweight holdings
+- ✅ Caps aggressive buys when `riskScore >= 8` and reduces `confidenceScore`
+- ✅ Maps profile horizons (`1-3`, `5-10`, `10+`) to `short/medium/long` labels
+- ✅ Binds `convictionScore3m` directly into `confidenceScore` adjustments
+- ✅ Ensures deterministic output for identical inputs to guard against drift
+
+**Remaining TODOs:**
+- [ ] Add integration test once `loadPortfolioContext` wires through portfolio service data
+- [ ] Cover scenario where holdings exist but lack current price data (weight derived from cost basis fallback)
+
 ---
 
 ## ✅ Agent 6: Historical Analysis & Charts - COMPLETE & MERGED
