@@ -157,3 +157,66 @@ export interface PortfolioContext {
   suggestedAction: PortfolioActionSuggestion;
   reasoning: string[];
 }
+
+// Tooltip Engine Types
+export type FinancialTerm =
+  // Valuation metrics
+  | 'pe_ratio'
+  | 'forward_pe'
+  | 'peg_ratio'
+  | 'earnings_yield'
+  | 'price_to_book'
+  | 'price_to_sales'
+  // Growth metrics
+  | 'eps_growth'
+  | 'revenue_growth'
+  | 'dividend_yield'
+  // Profitability metrics
+  | 'net_margin'
+  | 'operating_margin'
+  | 'roe'
+  | 'roa'
+  | 'roic'
+  // Liquidity & Solvency
+  | 'debt_to_equity'
+  | 'current_ratio'
+  | 'quick_ratio'
+  | 'free_cash_flow'
+  | 'fcf_yield'
+  // Technical indicators
+  | 'rsi'
+  | 'sma_20'
+  | 'sma_50'
+  | 'sma_200'
+  | 'volume'
+  | 'beta'
+  | 'volatility'
+  | '52w_high'
+  | '52w_low'
+  // Sentiment & Analysis
+  | 'analyst_consensus'
+  | 'price_target'
+  | 'risk_score'
+  | 'conviction_score'
+  // Portfolio metrics
+  | 'portfolio_allocation'
+  | 'concentration_risk'
+  | 'portfolio_beta'
+  | 'portfolio_volatility'
+  | 'cost_basis'
+  | 'unrealized_gain'
+  // Scenario analysis
+  | 'bull_scenario'
+  | 'base_scenario'
+  | 'bear_scenario'
+  | 'expected_return';
+
+export interface TooltipContent {
+  term: FinancialTerm;
+  title: string;
+  definition: string;
+  interpretation: string;
+  example?: string;
+  formula?: string;
+  category: 'valuation' | 'growth' | 'profitability' | 'liquidity' | 'technical' | 'sentiment' | 'portfolio' | 'scenario';
+}
