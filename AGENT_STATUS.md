@@ -17,6 +17,14 @@ Track progress of all 6 Cursor AI agents working on the Aurora Invest App.
 
 ---
 
+## 🆕 Agent 3 Update — 2025-12-05
+
+- Added `activeManagerRecommendation`, `activeManagerLoading`, and `activeManagerError` props to `components/analysis-dashboard.tsx`.
+- Created `components/active-manager-card.tsx` to visualize the portfolio-aware guidance.
+- Dashboard now renders the Active Manager card just above the disclaimer block so it sits near the guardrail messaging.
+
+---
+
 ## ✅ Agent 1: Enhance Valuation Logic - COMPLETE
 
 **Branch:** `feature/agent1-valuation-enhancement`
