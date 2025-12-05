@@ -2,28 +2,11 @@ import type {
   AnalysisResult,
   PortfolioContext,
   UserProfile,
+  ActiveManagerRecommendation,
+  ActiveManagerRecommendationInput,
+  ActiveManagerMandateFit,
+  ActiveManagerOversightLevel,
 } from './AnalysisTypes';
-
-export type ActiveManagerMandateFit = 'core' | 'satellite' | 'opportunistic';
-export type ActiveManagerOversightLevel = 'light' | 'standard' | 'heightened';
-
-export interface ActiveManagerRecommendation {
-  suitabilityScore: number;
-  mandateFit: ActiveManagerMandateFit;
-  oversightLevel: ActiveManagerOversightLevel;
-  summary: string;
-  rationale: string[];
-  actionChecklist: string[];
-  monitoringFocus: string[];
-  messagingCue: string;
-  timeHorizonMonths: number;
-}
-
-export interface ActiveManagerRecommendationInput {
-  analysis: AnalysisResult;
-  profile: UserProfile;
-  portfolioContext?: PortfolioContext | null;
-}
 
 const clamp = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) {

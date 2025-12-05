@@ -3,8 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
-import { AnalysisResult, StockData, HistoricalData, PortfolioContext } from '@/lib/domain/AnalysisTypes';
-import type { ActiveManagerRecommendation } from '@/lib/domain/activeManagerEngine';
+import {
+  AnalysisResult,
+  StockData,
+  HistoricalData,
+  PortfolioContext,
+  ActiveManagerRecommendation,
+} from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
 import { SentimentCard } from './sentiment-card';
