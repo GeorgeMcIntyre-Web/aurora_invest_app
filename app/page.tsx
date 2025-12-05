@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, Wallet } from 'lucide-react';
 import { StockForm } from '@/components/stock-form';
@@ -12,6 +12,10 @@ import {
   HistoricalData,
   PortfolioContext,
 } from '@/lib/domain/AnalysisTypes';
+import {
+  ActiveManagerRecommendation,
+  buildActiveManagerRecommendation,
+} from '@/lib/domain/activeManagerEngine';
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
 // Portfolio imports - temporarily disabled until service methods are implemented
@@ -314,10 +318,20 @@ export default function Home() {
   const cachedAnalyses = useRef<Map<string, CachedAnalysisRecord>>(new Map());
   const requestQueue = useRef<AnalysisRequest[]>([]);
   const processingRef = useRef(false);
+  const portfolioContextRef = useRef<PortfolioContext | null>(null);
+  const latestAnalysisRef = useRef<{ result: AnalysisResult; profile: UserProfile } | null>(null);
   const [portfolioContext, setPortfolioContext] = useState<PortfolioContext | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [quickAddPending, setQuickAddPending] = useState(false);
+  const [activeManagerRecommendation, setActiveManagerRecommendation] =
+    useState<ActiveManagerRecommendation | null>(null);
+  const [activeManagerError, setActiveManagerError] = useState<string | null>(null);
+  const [activeManagerLoading, setActiveManagerLoading] = useState(false);
+
+  useEffect(() => {
+    portfolioContextRef.current = portfolioContext;
+  }, [portfolioContext]);
 
   const loadPortfolioContext = useCallback(
     async (_ticker: string, _fallbackPrice = 0) => {
@@ -329,6 +343,45 @@ export default function Home() {
     },
     []
   );
+
+  const beginActiveManagerComputation = useCallback(() => {
+    setActiveManagerRecommendation(null);
+    setActiveManagerError(null);
+    setActiveManagerLoading(true);
+  }, [setActiveManagerRecommendation, setActiveManagerError, setActiveManagerLoading]);
+
+  const computeActiveManagerGuidance = useCallback(
+    (analysisPayload: AnalysisResult, profile: UserProfile, context: PortfolioContext | null) => {
+      try {
+        const recommendation = buildActiveManagerRecommendation({
+          analysis: analysisPayload,
+          profile,
+          portfolioContext: context,
+        });
+        setActiveManagerRecommendation(recommendation);
+        setActiveManagerError(null);
+      } catch (error) {
+        console.error('Active Manager recommendation generation failed', error);
+        setActiveManagerRecommendation(null);
+        setActiveManagerError('Unable to compute Active Manager guidance.');
+      } finally {
+        setActiveManagerLoading(false);
+      }
+    },
+    [setActiveManagerRecommendation, setActiveManagerError, setActiveManagerLoading]
+  );
+
+  useEffect(() => {
+    if (!portfolioContext || !latestAnalysisRef.current) {
+      return;
+    }
+    beginActiveManagerComputation();
+    computeActiveManagerGuidance(
+      latestAnalysisRef.current.result,
+      latestAnalysisRef.current.profile,
+      portfolioContext
+    );
+  }, [portfolioContext, beginActiveManagerComputation, computeActiveManagerGuidance]);
 
   const applyStage = (stage: LoadingStage) => {
     setLoadingStage(stage);
@@ -413,7 +466,7 @@ export default function Home() {
       });
   };
 
-  const hydrateFromCache = (entry: CachedAnalysisRecord) => {
+  const hydrateFromCache = (entry: CachedAnalysisRecord, profile: UserProfile) => {
     setErrorDetail(null);
     setResult(entry.result);
     setStock(entry.stock);
@@ -424,6 +477,9 @@ export default function Home() {
     setIsLoading(false);
     setIsCancellationPending(false);
     resetLoadingTracker();
+    beginActiveManagerComputation();
+    latestAnalysisRef.current = { result: entry.result, profile };
+    computeActiveManagerGuidance(entry.result, profile, portfolioContextRef.current);
     void loadPortfolioContext(entry.stock.ticker, entry.stock.technicals?.price ?? 0);
   };
 
@@ -434,6 +490,8 @@ export default function Home() {
     setStock(null);
     setIsCancellationPending(false);
     setCacheNotice(null);
+    latestAnalysisRef.current = null;
+    beginActiveManagerComputation();
     applyStage('fetching');
 
     try {
@@ -448,6 +506,7 @@ export default function Home() {
       applyStage('analyzing');
 
       const analysisResult = analyzeStock(request.profile, stockData);
+      latestAnalysisRef.current = { result: analysisResult, profile: request.profile };
 
       if (!analysisResult) {
         throw buildUserFriendlyError(
@@ -468,11 +527,19 @@ export default function Home() {
         throw CANCELLATION_ERROR;
       }
 
+      computeActiveManagerGuidance(
+        analysisResult,
+        request.profile,
+        portfolioContextRef.current
+      );
       setStock(stockData);
       setResult(analysisResult);
       persistToCache(request.cacheKey, { stock: stockData, result: analysisResult });
       await loadPortfolioContext(request.ticker, stockData?.technicals?.price ?? 0);
     } catch (err) {
+      setActiveManagerLoading(false);
+      setActiveManagerRecommendation(null);
+      setActiveManagerError((current) => current ?? 'Unable to compute Active Manager guidance.');
       setErrorDetail(buildUserFriendlyError(err));
     } finally {
       setIsLoading(false);
@@ -566,12 +633,13 @@ export default function Home() {
     const normalizedTicker = normalizeTicker(ticker);
     const cacheKey = buildCacheKey(normalizedTicker, profile);
     const cachedEntry = getCachedEntry(cacheKey);
+    portfolioContextRef.current = null;
     setPortfolioContext(null);
     setPortfolioError(null);
 
     if (cachedEntry) {
-      hydrateFromCache(cachedEntry);
-    void startHistoricalFetch(normalizedTicker);
+      hydrateFromCache(cachedEntry, profile);
+      void startHistoricalFetch(normalizedTicker);
       return;
     }
 
@@ -826,6 +894,9 @@ export default function Home() {
                 portfolioError={portfolioError}
                 onQuickAddHolding={handleQuickAddHolding}
                 quickAddBusy={quickAddPending}
+                activeManagerRecommendation={activeManagerRecommendation}
+                activeManagerError={activeManagerError}
+                activeManagerLoading={activeManagerLoading}
               />
             )}
           </div>
