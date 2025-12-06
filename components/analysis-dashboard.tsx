@@ -98,7 +98,7 @@ export function AnalysisDashboard({
     } catch (error) {
       console.error('AI Analysis failed', error);
       setAiAnalysis(null);
-      setAiError('AI Analysis is not available in static deployment mode. This feature requires a server environment.');
+      setAiError('AI Analysis temporarily unavailable. Please try again later.');
     } finally {
       setAiLoading(false);
     }
