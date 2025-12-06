@@ -17,6 +17,9 @@ A production-ready investment analysis tool that provides comprehensive stock an
 - **Interactive Visualizations**: Charts for scenarios, fundamentals, technicals
 - **Export Functionality**: Download JSON or print reports
 - **Dark Modern Theme**: Professional AuroraInvest design
+- **Active Manager & Portfolio Linking**: Framework recommendations adjust automatically based on holdings, weight, and risk guardrails.
+- **Portfolio Dashboard**: Track holdings, view allocation metrics, run bull/base/bear stress tests, and see Active Manager verdicts per position.
+- **Deep Math Verification (DeepSeek)**: Cloudflare Pages Function plus typed client service provide AI-backed reasoning with structured success/error states.
 
 ## 🚀 Getting Started
 
@@ -67,8 +70,28 @@ npm start
 | `NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES` | `2` | Automatic retries after failures |
 | `NEXT_PUBLIC_MARKET_DATA_BACKOFF_MS` | `500` | Base delay (ms) used for exponential backoff between retries |
 | `NEXT_PUBLIC_ALPHA_VANTAGE_OUTPUT_SIZE` | `compact` | Set to `full` if you need the entire Alpha Vantage time-series history |
+| `NEXT_PUBLIC_DEEP_VERIFICATION_URL` | _(optional)_ | Override for the Cloudflare Pages Function URL (falls back to `/api/ai-analysis`) |
+| `DEEPSEEK_API_KEY` | _(required for DeepSeek)_ | Server-side key used by the Next.js route and Cloudflare Function |
+| `DEEPSEEK_API_BASE` | `https://api.deepseek.com` | Base URL for the DeepSeek API |
+| `DEEPSEEK_MODEL` | `deepseek-chat` | Model name used for Deep Math verification |
+| `DEEP_VERIFICATION_TIMEOUT_MS` | `20000` | Timeout (ms) applied to DeepSeek requests |
 
 `.env.local` is git-ignored. Never commit real API keys.
+
+### Deep AI Verification
+
+1. Configure the DeepSeek credentials in `.env.local` (for local development) and in your Cloudflare Pages project settings (for production).
+2. The typed `functions/api/ai-analysis.js` Cloudflare Function enforces:
+   - Guard clauses for missing keys or malformed payloads.
+   - Uniform JSON responses (`success`, `config_error`, `bad_request`, `upstream_error`, `timeout`, `ai_unavailable`).
+   - Redaction of internal error details from user-facing responses.
+3. The frontend calls the function through `lib/services/deepVerificationService.ts`, which handles timeouts, cooldowns, and converts responses into typed UI states.
+
+### Cloudflare Pages Deployment
+
+- GitHub Actions workflow (`.github/workflows/deploy.yml`) installs dependencies via `npm ci`, runs `npm run lint`, `npm test`, and `npm run build` before deploying.
+- Set `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `DEEPSEEK_API_KEY` as repository secrets.
+- The build step relies on the same DeepSeek variables listed above (with mock market data provider defaults). Update the workflow env block if you change providers.
 
 ## 📊 Available Stocks (Mock Data)
 
@@ -133,6 +156,12 @@ The core analysis engine (`auroraEngine.ts`) is:
 4. **Sentiment Analysis**: Analyst consensus + news themes
 5. **Scenario Generation**: 3-month Bull/Base/Bear projections
 6. **Planning Guidance**: Position sizing, timing, risk notes
+
+## 💼 Portfolio Experience
+
+- Visit [`/portfolio`](/portfolio) to view holdings, total metrics, concentration warnings, and Active Manager recommendations per ticker.
+- The dashboard fetches fresh market data, runs the core analysis engine per holding, and surfaces a bull/base/bear stress test driven by the 3‑month scenario model.
+- Quick-add forms on the analysis page allow you to push a ticker directly into the default portfolio; the Active Manager card automatically recalculates with portfolio-aware context.
 
 ## 🛡️ Important Guardrails
 

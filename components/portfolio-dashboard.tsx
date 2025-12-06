@@ -17,12 +17,14 @@ import {
   Portfolio,
   PortfolioAllocation,
   PortfolioMetrics,
+  PortfolioStressTestResult,
   calculateAllocation,
   calculatePortfolioMetrics,
+  calculatePortfolioStressTest,
   detectConcentrationRisk,
 } from '@/lib/domain/portfolioEngine';
 import { portfolioService } from '@/lib/services/portfolioService';
-import { marketDataService } from '@/lib/services/marketDataService';
+import { buildPortfolioInsights, HoldingInsight } from '@/lib/services/portfolioInsightsService';
 import {
   Table,
   TableBody,
@@ -33,6 +35,7 @@ import {
   TableRow,
 } from './ui/table';
 import { cn } from '@/lib/utils';
+import { PortfolioStressTestCard } from './portfolio-stress-test-card';
 
 interface HoldingFormState {
   ticker: string;
@@ -54,6 +57,8 @@ export function PortfolioDashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [metrics, setMetrics] = useState<PortfolioMetrics>(EMPTY_METRICS);
   const [allocations, setAllocations] = useState<PortfolioAllocation[]>([]);
+  const [insights, setInsights] = useState<HoldingInsight[]>([]);
+  const [stressTest, setStressTest] = useState<PortfolioStressTestResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formState, setFormState] = useState<HoldingFormState>({
@@ -67,6 +72,7 @@ export function PortfolioDashboard() {
   useEffect(() => {
     async function ensurePortfolio() {
       setLoading(true);
+      setError(null);
       const existing = await portfolioService.getAllPortfolios();
       if (existing.length > 0) {
         setPortfolio(existing[0]);
@@ -82,47 +88,57 @@ export function PortfolioDashboard() {
   }, []);
 
   useEffect(() => {
-    async function hydrateMetrics(target: Portfolio | null) {
+    async function hydrateInsights(target: Portfolio | null) {
       if (!target) {
         setMetrics(EMPTY_METRICS);
         setAllocations([]);
+        setInsights([]);
+        setStressTest(null);
         return;
       }
 
       if (!target.holdings.length) {
         setMetrics(EMPTY_METRICS);
         setAllocations([]);
+        setInsights([]);
+        setStressTest(null);
         return;
       }
 
       setLoading(true);
       try {
-        const entries = await Promise.all(
-          target.holdings.map(async (holding) => {
-            const ticker = holding.ticker.toUpperCase();
-            try {
-              const stock = await marketDataService.fetchStockData(ticker);
-              const price = stock?.technicals?.price ?? holding.averageCostBasis;
-              return [ticker, price] as const;
-            } catch (fetchError) {
-              console.warn('[portfolio-dashboard] price lookup failed', fetchError);
-              return [ticker, holding.averageCostBasis] as const;
-            }
-          })
-        );
+        const bundle = await buildPortfolioInsights(target);
+        setAllocations(bundle.allocations);
+        setMetrics(bundle.metrics);
+        setInsights(bundle.insights);
 
-        const priceMap = new Map(entries);
-        setAllocations(calculateAllocation(target, priceMap));
-        setMetrics(calculatePortfolioMetrics(target, priceMap));
+        const snapshots = bundle.insights.map((insight) => insight.scenarioSnapshot);
+        const stress = calculatePortfolioStressTest(snapshots);
+        setStressTest(stress.entries.length > 0 ? stress : null);
+      } catch (serviceError) {
+        console.error('[portfolio-dashboard] Failed to build insights', serviceError);
+        setError('Unable to load portfolio insights at this time.');
+        setInsights([]);
+        setStressTest(null);
+        setAllocations([]);
+        setMetrics(EMPTY_METRICS);
       } finally {
         setLoading(false);
       }
     }
 
-    hydrateMetrics(portfolio);
+    void hydrateInsights(portfolio);
   }, [portfolio]);
 
   const concentration = useMemo(() => detectConcentrationRisk(allocations), [allocations]);
+
+  const insightLookup = useMemo(() => {
+    const map = new Map<string, HoldingInsight>();
+    insights.forEach((insight) => {
+      map.set(insight.ticker, insight);
+    });
+    return map;
+  }, [insights]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {
@@ -132,6 +148,38 @@ export function PortfolioDashboard() {
     }).format(value);
 
   const formatPercent = (value: number) => `${value.toFixed(2)}%`;
+
+  const getActionColor = (action?: string) => {
+    if (action === 'buy') {
+      return 'text-emerald-400';
+    }
+    if (action === 'sell') {
+      return 'text-red-400';
+    }
+    if (action === 'trim') {
+      return 'text-amber-400';
+    }
+    return 'text-ai-muted';
+  };
+
+  const renderInsightSummary = (ticker: string) => {
+    const insight = insightLookup.get(ticker);
+    if (!insight) {
+      return <span className="text-xs text-ai-muted">Analyze this holding to unlock insights.</span>;
+    }
+
+    const actionLabel = insight.activeManager.primaryAction.toUpperCase();
+    const rationale = insight.activeManager.rationale[0] ?? 'Framework rationale pending.';
+
+    return (
+      <div className="space-y-1">
+        <span className={cn('text-sm font-semibold', getActionColor(insight.activeManager.primaryAction))}>
+          {actionLabel} • {insight.activeManager.confidenceScore}/100
+        </span>
+        <p className="text-xs text-ai-muted line-clamp-2">{rationale}</p>
+      </div>
+    );
+  };
 
   const handleFormChange = (field: keyof HoldingFormState, value: string) => {
     setFormState((state) => ({ ...state, [field]: value }));
@@ -198,6 +246,10 @@ export function PortfolioDashboard() {
           Track holdings, monitor performance, and surface concentration risks in one view.
         </p>
       </div>
+
+      {stressTest && (
+        <PortfolioStressTestCard result={stressTest} loading={loading} />
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
@@ -304,7 +356,8 @@ export function PortfolioDashboard() {
                   <TableHead>Shares</TableHead>
                   <TableHead>Avg Cost</TableHead>
                   <TableHead>Value</TableHead>
-                  <TableHead>Gain / Loss</TableHead>
+                <TableHead>Gain / Loss</TableHead>
+                <TableHead>Active Manager</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -326,6 +379,7 @@ export function PortfolioDashboard() {
                       >
                         {formatCurrency(allocation.gainLoss)} ({formatPercent(allocation.gainLossPct)})
                       </TableCell>
+                      <TableCell>{renderInsightSummary(allocation.ticker)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

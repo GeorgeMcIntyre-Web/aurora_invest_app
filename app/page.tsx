@@ -17,6 +17,12 @@ import {
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { buildActiveManagerRecommendation } from '@/lib/domain/activeManagerEngine';
 import { marketDataService } from '@/lib/services/marketDataService';
+import {
+  calculateAllocation,
+  calculatePortfolioMetrics,
+  suggestPortfolioAction,
+} from '@/lib/domain/portfolioEngine';
+import { portfolioService } from '@/lib/services/portfolioService';
 // Portfolio imports - temporarily disabled until service methods are implemented
 // import {
 //   calculateAllocation,
@@ -84,6 +90,7 @@ const MAX_QUEUE_LENGTH = 5;
 interface CachedAnalysisRecord {
   stock: StockData;
   result: AnalysisResult;
+  profile: UserProfile;
   cachedAt: number;
 }
 
@@ -326,12 +333,57 @@ export default function Home() {
   const [activeManagerError, setActiveManagerError] = useState<string | null>(null);
 
   const loadPortfolioContext = useCallback(
-    async (_ticker: string, _fallbackPrice = 0) => {
-      // TODO: Portfolio context integration - needs service methods implemented
-      // const normalizedTicker = normalizeTicker(ticker);
-      setPortfolioContext(null);
-      setPortfolioLoading(false);
+    async (ticker: string, fallbackPrice = 0) => {
+      const normalizedTicker = normalizeTicker(ticker);
+      setPortfolioLoading(true);
       setPortfolioError(null);
+
+      try {
+        const portfolios = await portfolioService.getAllPortfolios();
+        const portfolio =
+          portfolios[0] ?? (await portfolioService.createPortfolio('My Portfolio'));
+
+        const priceMap = new Map<string, number>();
+        portfolio.holdings.forEach((holding) => {
+          const holdingTicker = normalizeTicker(holding.ticker);
+          if (holdingTicker === normalizedTicker && fallbackPrice > 0) {
+            priceMap.set(holdingTicker, fallbackPrice);
+            return;
+          }
+          priceMap.set(holdingTicker, holding.averageCostBasis);
+        });
+
+        const metrics = calculatePortfolioMetrics(portfolio, priceMap);
+        const allocations = calculateAllocation(portfolio, priceMap);
+        const allocation = allocations.find((item) => item.ticker === normalizedTicker);
+        const existingHolding = portfolio.holdings.find(
+          (holding) => normalizeTicker(holding.ticker) === normalizedTicker
+        );
+        const suggestion = suggestPortfolioAction(
+          normalizedTicker,
+          portfolio,
+          allocation?.weightPct ?? 0
+        );
+
+        const context: PortfolioContext = {
+          portfolioId: portfolio.id,
+          existingHolding,
+          portfolioMetrics: metrics,
+          suggestedAction: suggestion.action,
+          reasoning: suggestion.reasoning,
+          currentWeightPct: allocation?.weightPct ?? 0,
+        };
+
+        setPortfolioContext(context);
+        return context;
+      } catch (serviceError) {
+        console.error('[analysis] Failed to load portfolio context', serviceError);
+        setPortfolioContext(null);
+        setPortfolioError('Unable to load portfolio context.');
+        return null;
+      } finally {
+        setPortfolioLoading(false);
+      }
     },
     []
   );
@@ -369,7 +421,10 @@ export default function Home() {
     return entry;
   };
 
-  const persistToCache = (key: string, payload: { stock: StockData; result: AnalysisResult }) => {
+  const persistToCache = (
+    key: string,
+    payload: { stock: StockData; result: AnalysisResult; profile: UserProfile }
+  ) => {
     cachedAnalyses.current.set(key, {
       ...payload,
       cachedAt: Date.now(),
@@ -430,7 +485,34 @@ export default function Home() {
     setIsLoading(false);
     setIsCancellationPending(false);
     resetLoadingTracker();
-    void loadPortfolioContext(entry.stock.ticker, entry.stock.technicals?.price ?? 0);
+    void (async () => {
+      const context = await loadPortfolioContext(
+        entry.stock.ticker,
+        entry.stock.technicals?.price ?? 0
+      );
+      setActiveManagerLoading(true);
+      setActiveManagerError(null);
+      try {
+        const recommendation = buildActiveManagerRecommendation({
+          ticker: entry.stock.ticker,
+          analysisResult: entry.result,
+          userProfile: entry.profile,
+          portfolioContext: context
+            ? {
+                existingHolding: context.existingHolding,
+                currentWeight: context.currentWeightPct,
+                portfolioMetrics: context.portfolioMetrics,
+              }
+            : undefined,
+        });
+        setActiveManagerRecommendation(recommendation);
+      } catch (err) {
+        console.error('Active Manager generation failed:', err);
+        setActiveManagerError('Unable to generate recommendation.');
+      } finally {
+        setActiveManagerLoading(false);
+      }
+    })();
   };
 
   const runAnalysis = async (request: AnalysisRequest) => {
@@ -477,7 +559,13 @@ export default function Home() {
       setStock(stockData);
       setResult(analysisResult);
 
-      // Generate Active Manager recommendation
+      persistToCache(request.cacheKey, {
+        stock: stockData,
+        result: analysisResult,
+        profile: request.profile,
+      });
+      const context = await loadPortfolioContext(request.ticker, stockData?.technicals?.price ?? 0);
+
       setActiveManagerLoading(true);
       setActiveManagerError(null);
       try {
@@ -485,8 +573,13 @@ export default function Home() {
           ticker: request.ticker,
           analysisResult,
           userProfile: request.profile,
-          // Portfolio context will be added later when portfolio integration is complete
-          portfolioContext: undefined,
+          portfolioContext: context
+            ? {
+                existingHolding: context.existingHolding,
+                currentWeight: context.currentWeightPct,
+                portfolioMetrics: context.portfolioMetrics,
+              }
+            : undefined,
         };
         const recommendation = buildActiveManagerRecommendation(activeManagerInput);
         setActiveManagerRecommendation(recommendation);
@@ -496,9 +589,6 @@ export default function Home() {
       } finally {
         setActiveManagerLoading(false);
       }
-
-      persistToCache(request.cacheKey, { stock: stockData, result: analysisResult });
-      await loadPortfolioContext(request.ticker, stockData?.technicals?.price ?? 0);
     } catch (err) {
       setErrorDetail(buildUserFriendlyError(err));
     } finally {
@@ -566,13 +656,12 @@ export default function Home() {
       setQuickAddPending(true);
       setPortfolioError(null);
       try {
-        // TODO: Implement portfolio service addHolding method
-        // await portfolioService.addHolding(portfolioContext.portfolioId, {
-        //   ticker,
-        //   shares,
-        //   averageCostBasis,
-        //   purchaseDate,
-        // });
+        await portfolioService.upsertHolding(portfolioContext.portfolioId, {
+          ticker,
+          shares,
+          averageCostBasis,
+          purchaseDate,
+        });
         await loadPortfolioContext(ticker, stock?.technicals?.price ?? averageCostBasis);
       } catch (err) {
         console.error(err);

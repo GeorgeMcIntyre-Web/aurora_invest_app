@@ -67,6 +67,13 @@ All 6 Cursor AI agents successfully completed their work and merged to main!
 - ✅ Retry logic with exponential backoff
 - ✅ Historical data fetching and caching
 
+## 🔄 Post-1.0 Enhancements
+
+- **Active Manager + Portfolio Loop**: The analysis page now detects existing positions, surfaces guardrailed actions, and lets users push trades directly into the local portfolio store. The portfolio dashboard renders the same Active Manager verdict for every holding, closing the loop between analysis and ongoing stewardship.
+- **Portfolio Stress Testing**: A new pure domain aggregator converts the 3‑month scenario engine into bull/base/bear projections at the portfolio level, highlighting top risk drivers.
+- **DeepSeek Verification Hardening**: Both the Next.js API route and the Cloudflare Pages Function enforce typed request/response contracts, structured error codes, and timeout handling. A dedicated service + UI panel expose success/error states without leaking stack traces.
+- **Pipeline Quality Gates**: GitHub Actions now runs `npm ci`, `npm run lint`, `npm test`, and `npm run build` before every Cloudflare Pages deploy, ensuring only green builds make it to production.
+
 ### Testing (lib/domain/__tests__/, lib/services/__tests__/)
 - ✅ 21+ tests with real assertions
 - ✅ Quality score tests

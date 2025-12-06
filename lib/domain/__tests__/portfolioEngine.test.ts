@@ -4,8 +4,10 @@ import {
   calculateAllocation,
   calculatePortfolioBeta,
   calculatePortfolioMetrics,
+  calculatePortfolioStressTest,
   detectConcentrationRisk,
   suggestPortfolioAction,
+  HoldingScenarioSnapshot,
 } from '../portfolioEngine';
 
 const createPortfolio = (holdings: PortfolioHolding[]): Portfolio => ({
@@ -147,5 +149,50 @@ describe('suggestPortfolioAction', () => {
 
     const suggestion = suggestPortfolioAction('AAPL', portfolio, 18);
     expect(suggestion.action).toBe('hold');
+  });
+});
+
+describe('calculatePortfolioStressTest', () => {
+  it('aggregates scenario outcomes across holdings', () => {
+    const snapshots: HoldingScenarioSnapshot[] = [
+      {
+        ticker: 'AAPL',
+        shares: 10,
+        currentPrice: 180,
+        scenarios: {
+          horizonMonths: 3,
+          bull: { expectedReturnPctRange: [10, 15], probabilityPct: 30, description: '' },
+          base: { expectedReturnPctRange: [2, 5], probabilityPct: 50, description: '' },
+          bear: { expectedReturnPctRange: [-12, -5], probabilityPct: 20, description: '' },
+          pointEstimateReturnPct: 4,
+          uncertaintyComment: '',
+        },
+      },
+      {
+        ticker: 'MSFT',
+        shares: 5,
+        currentPrice: 320,
+        scenarios: {
+          horizonMonths: 3,
+          bull: { expectedReturnPctRange: [8, 12], probabilityPct: 30, description: '' },
+          base: { expectedReturnPctRange: [1, 4], probabilityPct: 50, description: '' },
+          bear: { expectedReturnPctRange: [-10, -3], probabilityPct: 20, description: '' },
+          pointEstimateReturnPct: 3,
+          uncertaintyComment: '',
+        },
+      },
+    ];
+
+    const result = calculatePortfolioStressTest(snapshots);
+    expect(result.currentValue).toBeGreaterThan(0);
+    expect(result.bullValue).toBeGreaterThan(result.currentValue);
+    expect(result.bearValue).toBeLessThan(result.currentValue);
+    expect(result.entries).toHaveLength(2);
+  });
+
+  it('returns zeros for empty snapshots', () => {
+    const result = calculatePortfolioStressTest([]);
+    expect(result.currentValue).toBe(0);
+    expect(result.entries).toHaveLength(0);
   });
 });

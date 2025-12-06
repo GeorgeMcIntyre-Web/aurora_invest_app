@@ -158,7 +158,46 @@ export interface PortfolioContext {
   portfolioMetrics: PortfolioMetrics;
   suggestedAction: PortfolioActionSuggestion;
   reasoning: string[];
+  currentWeightPct?: number;
 }
+
+export type DeepVerificationStatus =
+  | 'success'
+  | 'config_error'
+  | 'bad_request'
+  | 'upstream_error'
+  | 'timeout'
+  | 'ai_unavailable';
+
+export type DeepVerificationConfidence = 'low' | 'medium' | 'high';
+
+export interface DeepVerificationRequest {
+  ticker: string;
+  fundamentals?: StockFundamentals | null;
+  technicals?: StockTechnicals | null;
+}
+
+export interface DeepVerificationSuccess {
+  status: 'success';
+  provider: 'deepseek';
+  verdict: string;
+  confidenceLabel: DeepVerificationConfidence;
+  confidenceScore: number;
+  reasoning: string;
+  analysis: string;
+  bulletPoints: string[];
+  generatedAt: string;
+  rawResponse?: string;
+}
+
+export interface DeepVerificationError {
+  status: Exclude<DeepVerificationStatus, 'success'>;
+  message: string;
+  detail?: string;
+  retryable: boolean;
+}
+
+export type DeepVerificationResult = DeepVerificationSuccess | DeepVerificationError;
 
 // Tooltip Engine Types
 export type FinancialTerm =

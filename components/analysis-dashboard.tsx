@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle, BrainCircuit, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Shield, Award, Lightbulb, AlertTriangle } from 'lucide-react';
 import { AnalysisResult, StockData, HistoricalData, PortfolioContext, ActiveManagerRecommendation } from '@/lib/domain/AnalysisTypes';
 import { FundamentalsCard } from './fundamentals-card';
 import { TechnicalsCard } from './technicals-card';
@@ -16,9 +16,9 @@ import { ActiveManagerCard } from './active-manager-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { FinancialTooltip } from './financial-tooltip';
+import { DeepVerificationPanel } from './deep-verification-panel';
 import { cn } from '@/lib/utils';
 
 type HistoricalPeriod = HistoricalData['period'];
@@ -62,9 +62,6 @@ export function AnalysisDashboard({
   const [quickAddCost, setQuickAddCost] = useState('');
   const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
-  const [aiAnalysis, setAiAnalysis] = useState<{ reasoning: string; analysis: string } | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   if (!result) {
     return null;
@@ -74,35 +71,6 @@ export function AnalysisDashboard({
   const scenarios = result?.scenarios;
   const planningGuidance = result?.planningGuidance;
   const historicalDataset = historicalSeries?.[selectedPeriod] ?? null;
-
-  const runDeepAnalysis = async () => {
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const response = await fetch('/api/ai-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: stock.ticker,
-          fundamentals: stock.fundamentals,
-          technicals: stock.technicals,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('AI analysis request failed');
-      }
-
-      const data = await response.json();
-      setAiAnalysis(data);
-    } catch (error) {
-      console.error('AI Analysis failed', error);
-      setAiAnalysis(null);
-      setAiError('AI Analysis temporarily unavailable. Please try again later.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const handleQuickAdd = async () => {
     if (!onQuickAddHolding) {
@@ -227,58 +195,7 @@ export function AnalysisDashboard({
         </div>
       </div>
 
-        {/* Deep Math Analysis Section */}
-        <div className="bg-ai-card border border-ai-accent/30 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <BrainCircuit className="h-6 w-6 text-purple-400" />
-              <h2 className="text-xl font-bold text-ai-text">Deep Math V2 Verification</h2>
-            </div>
-            <Button
-              onClick={() => void runDeepAnalysis()}
-              disabled={aiLoading}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              {aiLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying Math...
-                </>
-              ) : (
-                'Run Deep Verification'
-              )}
-            </Button>
-          </div>
-
-          {aiError && (
-            <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mt-4">
-              <p className="text-sm text-yellow-200">{aiError}</p>
-            </div>
-          )}
-
-          {aiAnalysis && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4">
-              <Card className="bg-black/20 border-purple-500/30">
-                <CardHeader>
-                  <CardTitle className="text-sm font-mono text-purple-300">STEP-BY-STEP REASONING</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-invert prose-sm max-h-[400px] overflow-y-auto font-mono text-xs text-gray-300 whitespace-pre-wrap bg-black/40 p-4 rounded">
-                    {aiAnalysis.reasoning}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-ai-bg/50">
-                <CardHeader>
-                  <CardTitle className="text-ai-accent">Strategic Conclusion</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-invert text-sm text-ai-text whitespace-pre-wrap">{aiAnalysis.analysis}</div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+        <DeepVerificationPanel stock={stock} analysis={result} />
 
         {/* Active Manager Recommendation - Moved to top for visibility */}
         <ActiveManagerCard
@@ -301,14 +218,68 @@ export function AnalysisDashboard({
           </div>
           {portfolioLoading && <p className="text-sm text-ai-muted">Loading portfolio insights...</p>}
           {portfolioError && <p className="text-sm text-red-400">{portfolioError}</p>}
-          {/* TODO: Portfolio context UI - temporarily disabled until types are aligned */}
           {portfolioContext && (
             <div className="space-y-4">
-              <p className="text-sm text-ai-muted">
-                Portfolio integration in progress. Visit the{' '}
-                <a href="/portfolio" className="text-ai-accent hover:underline">portfolio page</a>{' '}
-                to manage holdings.
-              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-gray-800 p-4">
+                  <p className="text-xs uppercase text-ai-muted mb-1">Current position</p>
+                  {portfolioContext.existingHolding ? (
+                    <div className="text-sm text-ai-text space-y-1">
+                      <p>
+                        Shares:{' '}
+                        <span className="font-semibold">
+                          {portfolioContext.existingHolding.shares.toLocaleString()}
+                        </span>
+                      </p>
+                      <p>
+                        Avg cost:{' '}
+                        <span className="font-semibold">
+                          ${portfolioContext.existingHolding.averageCostBasis.toFixed(2)}
+                        </span>
+                      </p>
+                      <p>
+                        Portfolio weight:{' '}
+                        <span className="font-semibold">
+                          {(portfolioContext.currentWeightPct ?? 0).toFixed(2)}%
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-ai-muted">
+                      Not currently held in the default portfolio.
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-gray-800 p-4">
+                  <p className="text-xs uppercase text-ai-muted mb-1">Portfolio metrics</p>
+                  <p className="text-sm text-ai-text">
+                    Value:{' '}
+                    <span className="font-semibold">
+                      ${portfolioContext.portfolioMetrics.totalValue.toLocaleString()}
+                    </span>
+                  </p>
+                  <p className="text-sm text-ai-muted">
+                    Gain/Loss:{' '}
+                    <span className={portfolioContext.portfolioMetrics.totalGainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                      ${portfolioContext.portfolioMetrics.totalGainLoss.toLocaleString()} (
+                      {portfolioContext.portfolioMetrics.totalGainLossPct.toFixed(2)}%)
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-800 p-4">
+                <p className="text-xs uppercase text-ai-muted mb-2">Suggested action</p>
+                <p className="text-sm font-semibold text-ai-text">
+                  {portfolioContext.suggestedAction.toUpperCase()}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {portfolioContext.reasoning.map((reason) => (
+                    <li key={reason} className="text-xs text-ai-muted">
+                      • {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
               {onQuickAddHolding && (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                   <div>

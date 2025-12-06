@@ -5,6 +5,8 @@
  * calculations portable across environments (browser, server, tests).
  */
 
+import type { ScenarioSummary } from './AnalysisTypes';
+
 export type PortfolioAction = 'buy' | 'hold' | 'trim' | 'sell';
 
 export interface PortfolioHolding {
@@ -43,6 +45,30 @@ export interface ConcentrationRisk {
   level: 'low' | 'moderate' | 'high';
   warnings: string[];
   largestPositions: { ticker: string; weightPct: number }[];
+}
+
+export interface HoldingScenarioSnapshot {
+  ticker: string;
+  shares: number;
+  currentPrice: number;
+  scenarios: ScenarioSummary;
+}
+
+export interface PortfolioStressTestResult {
+  currentValue: number;
+  bullValue: number;
+  baseValue: number;
+  bearValue: number;
+  bullChangePct: number;
+  baseChangePct: number;
+  bearChangePct: number;
+  entries: Array<{
+    ticker: string;
+    currentValue: number;
+    bullValue: number;
+    baseValue: number;
+    bearValue: number;
+  }>;
 }
 
 const round = (value: number, digits = 2): number => {
@@ -161,6 +187,22 @@ const estimateVolatility = (allocations: PortfolioAllocation[]): number => {
   const concentrationPenalty = Math.max(0, Math.max(...allocations.map((a) => a.weightPct)) - 25);
   const volatility = 12 + Math.sqrt(weightSquares) * 15 + concentrationPenalty * 0.3;
   return round(volatility, 2);
+};
+
+const getScenarioMidpoint = (range?: [number, number]): number => {
+  if (!range || range.length !== 2) {
+    return 0;
+  }
+  const [low, high] = range;
+  const safeLow = Number.isFinite(low) ? low : 0;
+  const safeHigh = Number.isFinite(high) ? high : safeLow;
+  return (safeLow + safeHigh) / 2;
+};
+
+const projectScenarioValue = (currentValue: number, range?: [number, number]): number => {
+  const midpoint = getScenarioMidpoint(range);
+  const projected = currentValue * (1 + midpoint / 100);
+  return round(projected, 2);
 };
 
 /**
@@ -287,4 +329,80 @@ export function suggestPortfolioAction(
   );
   reasoning.push('Maintain current size while monitoring fundamentals and risk exposure.');
   return { action: 'hold', reasoning };
+}
+
+const defaultStressTestResult: PortfolioStressTestResult = {
+  currentValue: 0,
+  bullValue: 0,
+  baseValue: 0,
+  bearValue: 0,
+  bullChangePct: 0,
+  baseChangePct: 0,
+  bearChangePct: 0,
+  entries: [],
+};
+
+/**
+ * Aggregate holding-level scenario outcomes into a portfolio stress test.
+ */
+export function calculatePortfolioStressTest(
+  snapshots: HoldingScenarioSnapshot[]
+): PortfolioStressTestResult {
+  if (!snapshots?.length) {
+    return { ...defaultStressTestResult };
+  }
+
+  const entries = snapshots.map((snapshot) => {
+    const currentValue = round(snapshot.shares * snapshot.currentPrice, 2);
+    const scenarios = snapshot.scenarios ?? null;
+
+    const bullValue = projectScenarioValue(
+      currentValue,
+      scenarios?.bull?.expectedReturnPctRange
+    );
+    const baseValue = projectScenarioValue(
+      currentValue,
+      scenarios?.base?.expectedReturnPctRange
+    );
+    const bearValue = projectScenarioValue(
+      currentValue,
+      scenarios?.bear?.expectedReturnPctRange
+    );
+
+    return {
+      ticker: snapshot.ticker.toUpperCase(),
+      currentValue,
+      bullValue,
+      baseValue,
+      bearValue,
+    };
+  });
+
+  const totals = entries.reduce(
+    (acc, entry) => ({
+      currentValue: acc.currentValue + entry.currentValue,
+      bullValue: acc.bullValue + entry.bullValue,
+      baseValue: acc.baseValue + entry.baseValue,
+      bearValue: acc.bearValue + entry.bearValue,
+    }),
+    { currentValue: 0, bullValue: 0, baseValue: 0, bearValue: 0 }
+  );
+
+  const changePct = (scenarioValue: number) => {
+    if (totals.currentValue === 0) {
+      return 0;
+    }
+    return round(((scenarioValue - totals.currentValue) / totals.currentValue) * 100, 2);
+  };
+
+  return {
+    currentValue: round(totals.currentValue, 2),
+    bullValue: round(totals.bullValue, 2),
+    baseValue: round(totals.baseValue, 2),
+    bearValue: round(totals.bearValue, 2),
+    bullChangePct: changePct(totals.bullValue),
+    baseChangePct: changePct(totals.baseValue),
+    bearChangePct: changePct(totals.bearValue),
+    entries,
+  };
 }
