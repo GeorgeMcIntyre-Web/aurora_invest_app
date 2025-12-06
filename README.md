@@ -70,7 +70,8 @@ npm start
 | `NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES` | `2` | Automatic retries after failures |
 | `NEXT_PUBLIC_MARKET_DATA_BACKOFF_MS` | `500` | Base delay (ms) used for exponential backoff between retries |
 | `NEXT_PUBLIC_ALPHA_VANTAGE_OUTPUT_SIZE` | `compact` | Set to `full` if you need the entire Alpha Vantage time-series history |
-| `NEXT_PUBLIC_DEEP_VERIFICATION_URL` | _(optional)_ | Override for the Cloudflare Pages Function URL (falls back to `/api/ai-analysis`) |
+| `NEXT_PUBLIC_DEEP_VERIFICATION_ENDPOINT` | `/api/ai-analysis` | Client endpoint for verification requests (can point to a Cloudflare Pages Function) |
+| `NEXT_PUBLIC_AI_VERIFICATION_PROVIDER` | `deepseek` | Provider key used by the orchestrator (`deepseek`, `demo`, `openai` when implemented) |
 | `DEEPSEEK_API_KEY` | _(required for DeepSeek)_ | Server-side key used by the Next.js route and Cloudflare Function |
 | `DEEPSEEK_API_BASE` | `https://api.deepseek.com` | Base URL for the DeepSeek API |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | Model name used for Deep Math verification |
@@ -78,14 +79,11 @@ npm start
 
 `.env.local` is git-ignored. Never commit real API keys.
 
-### Deep AI Verification
+### AI Verification (DeepSeek via Cloudflare)
 
-1. Configure the DeepSeek credentials in `.env.local` (for local development) and in your Cloudflare Pages project settings (for production).
-2. The typed `functions/api/ai-analysis.js` Cloudflare Function enforces:
-   - Guard clauses for missing keys or malformed payloads.
-   - Uniform JSON responses (`success`, `config_error`, `bad_request`, `upstream_error`, `timeout`, `ai_unavailable`).
-   - Redaction of internal error details from user-facing responses.
-3. The frontend calls the function through `lib/services/deepVerificationService.ts`, which handles timeouts, cooldowns, and converts responses into typed UI states.
+1. Configure `DEEPSEEK_*` variables locally and inside Cloudflare Pages. The Next.js route (`/api/ai-analysis`) and the Pages Function (`functions/api/ai-analysis.ts`) both import the shared helpers in `lib/services/ai/deepseekServerHelpers.ts` so the same prompt + mapping logic runs in either environment.
+2. The typed client-side service lives in `lib/services/ai`: `DeepSeekProvider` fetches the configured endpoint, `aiOrchestrator` selects among providers, and `useAiVerification` exposes a React-friendly API for UI components.
+3. Set `NEXT_PUBLIC_AI_VERIFICATION_PROVIDER=demo` to exercise the UI without hitting DeepSeek. Set it to `deepseek` (default) to route through the Cloudflare function or Next.js API route defined via `NEXT_PUBLIC_DEEP_VERIFICATION_ENDPOINT`.
 
 ### Cloudflare Pages Deployment
 

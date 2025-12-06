@@ -1,58 +1,47 @@
-import { NextResponse } from 'next/server';
-import type { AiVerificationResult } from '@/lib/domain/AnalysisTypes';
 import {
   buildDeepSeekPrompt,
   mapDeepSeekCompletionToResult,
   extractDeepSeekErrorDetail,
   extractDeepSeekChoiceContent,
-} from '@/lib/services/ai/deepseekServerHelpers';
+} from '../../lib/services/ai/deepseekServerHelpers';
+import type { AiVerificationResult } from '../../lib/domain/AnalysisTypes';
 
 const DEFAULT_MODEL = 'deepseek-chat';
 const DEFAULT_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_TIMEOUT_MS = 20_000;
 
-const jsonResponse = (body: unknown, status = 200) =>
-  NextResponse.json(body, {
-    status,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
-
-const parseRequestBody = async (request: Request) => {
-  try {
-    return await request.json();
-  } catch (error) {
-    throw new Response('Invalid JSON payload.', {
-      status: 400,
-      statusText: error instanceof Error ? error.message : 'Invalid JSON payload.',
-    });
-  }
+const corsHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
 };
 
-export async function POST(request: Request) {
-  const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+const createResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: corsHeaders,
+  });
+
+export async function onRequestPost(context: { request: Request; env: Record<string, string> }) {
+  const apiKey = context?.env?.DEEPSEEK_API_KEY?.trim();
   if (!apiKey) {
-    return jsonResponse(
-      { error: 'DeepSeek API key missing. Set DEEPSEEK_API_KEY in your environment.' },
+    return createResponse(
+      { error: 'DeepSeek API key is not configured. Set DEEPSEEK_API_KEY in Cloudflare Pages.' },
       500
     );
   }
 
   let body: Record<string, unknown>;
   try {
-    body = await parseRequestBody(request);
+    body = await context.request.json();
   } catch (error) {
-    if (error instanceof Response) {
-      return jsonResponse({ error: error.statusText }, error.status);
-    }
-    return jsonResponse({ error: 'Invalid request body.' }, 400);
+    const message = error instanceof Error ? error.message : 'Invalid JSON payload.';
+    return createResponse({ error: 'Request body must be valid JSON.', detail: message }, 400);
   }
 
   const ticker =
     typeof body?.ticker === 'string' ? body.ticker.trim().toUpperCase() : '';
   if (!ticker) {
-    return jsonResponse({ error: 'Ticker is required for AI verification.' }, 400);
+    return createResponse({ error: 'Ticker is required for AI verification.' }, 400);
   }
 
   const fundamentals =
@@ -66,9 +55,9 @@ export async function POST(request: Request) {
   const analysisSummary =
     typeof body.analysisSummary === 'string' ? body.analysisSummary : undefined;
 
-  const baseUrl = process.env.DEEPSEEK_API_BASE ?? DEFAULT_BASE_URL;
-  const model = process.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
-  const timeoutMs = Number(process.env.DEEP_VERIFICATION_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  const baseUrl = context.env.DEEPSEEK_API_BASE ?? DEFAULT_BASE_URL;
+  const model = context.env.DEEPSEEK_MODEL ?? DEFAULT_MODEL;
+  const timeoutMs = Number(context.env.DEEP_VERIFICATION_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -89,7 +78,10 @@ export async function POST(request: Request) {
             role: 'system',
             content: buildDeepSeekPrompt(ticker, fundamentals, technicals, analysisSummary),
           },
-          { role: 'user', content: `Run Deep Math V2 for ${ticker}.` },
+          {
+            role: 'user',
+            content: `Run the Deep Math V2 verification for ${ticker} and respond with JSON.`,
+          },
         ],
       }),
       signal: controller.signal,
@@ -97,22 +89,20 @@ export async function POST(request: Request) {
 
     const rawText = await response.text();
     if (!rawText || rawText.trim().length === 0) {
-      return jsonResponse({ error: 'DeepSeek returned an empty response.' }, 502);
+      return createResponse({ error: 'DeepSeek returned an empty response.' }, 502);
     }
 
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(rawText);
     } catch (error) {
-      return jsonResponse(
-        { error: 'DeepSeek returned malformed JSON.', detail: error instanceof Error ? error.message : undefined },
-        502
-      );
+      const message = error instanceof Error ? error.message : 'Invalid JSON payload.';
+      return createResponse({ error: 'DeepSeek returned malformed JSON.', detail: message }, 502);
     }
 
     if (!response.ok) {
       const detail = extractDeepSeekErrorDetail(parsed, response.status);
-      return jsonResponse(
+      return createResponse(
         { error: 'DeepSeek rejected the verification request.', detail },
         response.status
       );
@@ -140,16 +130,27 @@ export async function POST(request: Request) {
       fallbackText,
     });
 
-    return jsonResponse(payload, 200);
+    return createResponse(payload, 200);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      return jsonResponse({ error: 'Deep verification timed out.' }, 504);
+      return createResponse({ error: 'Deep verification timed out.' }, 504);
     }
-    return jsonResponse(
-      { error: 'Deep verification is temporarily unavailable.', detail: error instanceof Error ? error.message : undefined },
+    const detail = error instanceof Error ? error.message : 'Unknown error.';
+    return createResponse(
+      { error: 'Deep verification is temporarily unavailable.', detail },
       502
     );
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function onRequestOptions() {
+  return new Response(null, {
+    headers: {
+      ...corsHeaders,
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }

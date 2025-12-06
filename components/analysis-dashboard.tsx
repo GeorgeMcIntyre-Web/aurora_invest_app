@@ -18,8 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { FinancialTooltip } from './financial-tooltip';
-import { DeepVerificationPanel } from './deep-verification-panel';
-import { cn } from '@/lib/utils';
+import { useAiVerification } from '@/hooks/use-ai-verification';
+import { AiVerificationCard } from './ai-verification-card';
 
 type HistoricalPeriod = HistoricalData['period'];
 
@@ -62,6 +62,12 @@ export function AnalysisDashboard({
   const [quickAddCost, setQuickAddCost] = useState('');
   const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
+  const {
+    result: aiVerificationResult,
+    status: aiVerificationStatus,
+    error: aiVerificationError,
+    runVerification: runAiVerification,
+  } = useAiVerification({ stock, analysis: result });
 
   if (!result) {
     return null;
@@ -195,7 +201,13 @@ export function AnalysisDashboard({
         </div>
       </div>
 
-        <DeepVerificationPanel stock={stock} analysis={result} />
+        <AiVerificationCard
+          verification={aiVerificationResult}
+          status={aiVerificationStatus}
+          error={aiVerificationError}
+          onRun={() => void runAiVerification()}
+          disabled={!stock?.ticker}
+        />
 
         {/* Active Manager Recommendation - Moved to top for visibility */}
         <ActiveManagerCard

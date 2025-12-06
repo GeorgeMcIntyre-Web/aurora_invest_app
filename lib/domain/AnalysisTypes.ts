@@ -161,43 +161,39 @@ export interface PortfolioContext {
   currentWeightPct?: number;
 }
 
-export type DeepVerificationStatus =
-  | 'success'
-  | 'config_error'
-  | 'bad_request'
-  | 'upstream_error'
-  | 'timeout'
-  | 'ai_unavailable';
+export type AiProviderName = 'deepseek' | 'openai' | 'demo';
 
-export type DeepVerificationConfidence = 'low' | 'medium' | 'high';
+export type AiVerificationAlignment =
+  | 'aligned'
+  | 'partially_aligned'
+  | 'contradictory'
+  | 'unknown';
 
-export interface DeepVerificationRequest {
+export type AiVerificationConfidence = 'high' | 'medium' | 'low' | 'unknown';
+
+export interface AiVerificationRequest {
   ticker: string;
-  fundamentals?: StockFundamentals | null;
-  technicals?: StockTechnicals | null;
+  userProfileSummary?: string;
+  analysisSummary?: string;
+  fundamentals?: StockFundamentals;
+  technicals?: StockTechnicals;
 }
 
-export interface DeepVerificationSuccess {
-  status: 'success';
-  provider: 'deepseek';
-  verdict: string;
-  confidenceLabel: DeepVerificationConfidence;
-  confidenceScore: number;
-  reasoning: string;
-  analysis: string;
-  bulletPoints: string[];
-  generatedAt: string;
-  rawResponse?: string;
+export interface AiVerificationResult {
+  ticker: string;
+  summary: string;
+  reasoningSteps: string[];
+  strengths: string[];
+  weaknesses: string[];
+  alignmentWithAuroraView: AiVerificationAlignment;
+  riskFlags: string[];
+  disclaimers: string[];
+  providerName: AiProviderName;
+  rawProviderLabel?: string;
+  timestampIso: string;
+  confidenceLevel: AiVerificationConfidence;
+  rawAnalysis?: string;
 }
-
-export interface DeepVerificationError {
-  status: Exclude<DeepVerificationStatus, 'success'>;
-  message: string;
-  detail?: string;
-  retryable: boolean;
-}
-
-export type DeepVerificationResult = DeepVerificationSuccess | DeepVerificationError;
 
 // Tooltip Engine Types
 export type FinancialTerm =
