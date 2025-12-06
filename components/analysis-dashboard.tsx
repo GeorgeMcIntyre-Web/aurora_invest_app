@@ -58,6 +58,13 @@ export function AnalysisDashboard({
   activeManagerLoading = false,
   activeManagerError = null,
 }: AnalysisDashboardProps) {
+  const [quickAddShares, setQuickAddShares] = useState('');
+  const [quickAddCost, setQuickAddCost] = useState('');
+  const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
+  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{ reasoning: string; analysis: string } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   if (!result) {
     return null;
   }
@@ -66,12 +73,6 @@ export function AnalysisDashboard({
   const scenarios = result?.scenarios;
   const planningGuidance = result?.planningGuidance;
   const historicalDataset = historicalSeries?.[selectedPeriod] ?? null;
-  const [quickAddShares, setQuickAddShares] = useState('');
-  const [quickAddCost, setQuickAddCost] = useState('');
-  const [quickAddDate, setQuickAddDate] = useState(new Date().toISOString().split('T')[0]);
-  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
-  const [aiAnalysis, setAiAnalysis] = useState<{ reasoning: string; analysis: string } | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   const runDeepAnalysis = async () => {
     setAiLoading(true);
