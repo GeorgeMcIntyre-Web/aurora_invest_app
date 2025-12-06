@@ -64,6 +64,7 @@ export function AnalysisDashboard({
   const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{ reasoning: string; analysis: string } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   if (!result) {
     return null;
@@ -76,6 +77,7 @@ export function AnalysisDashboard({
 
   const runDeepAnalysis = async () => {
     setAiLoading(true);
+    setAiError(null);
     try {
       const response = await fetch('/api/ai-analysis', {
         method: 'POST',
@@ -96,6 +98,7 @@ export function AnalysisDashboard({
     } catch (error) {
       console.error('AI Analysis failed', error);
       setAiAnalysis(null);
+      setAiError('AI Analysis is not available in static deployment mode. This feature requires a server environment.');
     } finally {
       setAiLoading(false);
     }
@@ -245,6 +248,12 @@ export function AnalysisDashboard({
               )}
             </Button>
           </div>
+
+          {aiError && (
+            <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mt-4">
+              <p className="text-sm text-yellow-200">{aiError}</p>
+            </div>
+          )}
 
           {aiAnalysis && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4">
