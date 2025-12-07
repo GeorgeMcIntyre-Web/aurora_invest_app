@@ -2,6 +2,7 @@
 import { HistoricalData, HistoricalDataPoint, StockData } from '../domain/AnalysisTypes';
 import { getMockStockData } from '../data/mockData';
 import { AlphaVantageService } from './implementations/AlphaVantageService';
+import { YahooFinanceService } from './implementations/YahooFinanceService';
 
 const PERIOD_DAY_MAP: Record<HistoricalData['period'], number> = {
   '1M': 21,
@@ -140,17 +141,29 @@ export class MockMarketDataService implements MarketDataService {
 /**
  * Factory to create the active MarketDataService.
  * Selects between the mock demo dataset and real providers based on env config.
+ *
+ * Supported providers:
+ * - 'yahoo': Yahoo Finance (free, no API key required) - DEFAULT for live data
+ * - 'alpha_vantage': Alpha Vantage (requires API key)
+ * - 'demo': Mock data (5 demo tickers)
  */
 export function createMarketDataService(): MarketDataService {
   const providerPreference =
-    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
+    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'yahoo';
 
+  // Yahoo Finance (default, no API key needed)
+  if (providerPreference === 'yahoo') {
+    return new YahooFinanceService();
+  }
+
+  // Alpha Vantage (requires API key)
   if (providerPreference === 'alpha_vantage') {
     const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
     if (!apiKey) {
       console.warn(
-        '[marketDataService] Alpha Vantage selected but NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY is missing. Falling back to mock data.'
+        '[marketDataService] Alpha Vantage selected but NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY is missing. Falling back to Yahoo Finance.'
       );
+      return new YahooFinanceService();
     } else {
       const timeoutMs = parseEnvNumber(process.env.NEXT_PUBLIC_MARKET_DATA_TIMEOUT_MS, 10_000);
       const maxRetries = parseEnvNumber(process.env.NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES, 2);
@@ -169,6 +182,7 @@ export function createMarketDataService(): MarketDataService {
     }
   }
 
+  // Demo mode
   return new MockMarketDataService();
 }
 
@@ -176,18 +190,25 @@ export function createMarketDataService(): MarketDataService {
 export const marketDataService: MarketDataService = createMarketDataService();
 
 /**
- * Returns the current data mode: 'live' (Alpha Vantage) or 'demo' (mock data).
+ * Returns the current data mode: 'live' (Yahoo/Alpha Vantage) or 'demo' (mock data).
  * Useful for UI indicators and validation logic.
  */
 export function getMarketDataMode(): 'live' | 'demo' {
   const providerPreference =
-    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
-  const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
+    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'yahoo';
 
-  if (providerPreference === 'alpha_vantage' && apiKey) {
+  // Yahoo Finance is live by default (no API key needed)
+  if (providerPreference === 'yahoo') {
     return 'live';
   }
 
+  // Alpha Vantage requires API key
+  if (providerPreference === 'alpha_vantage') {
+    const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
+    return apiKey ? 'live' : 'demo';
+  }
+
+  // Demo mode
   return 'demo';
 }
 

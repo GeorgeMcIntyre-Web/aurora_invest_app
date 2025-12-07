@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { Search, TrendingUp, Zap, Database } from 'lucide-react';
 import { UserProfile, RiskTolerance, InvestmentHorizon, InvestmentObjective } from '@/lib/domain/AnalysisTypes';
+import { StockSearchInput } from './stock-search-input';
+import { InvestmentProfileSelector } from './investment-profile-selector';
 
 interface StockFormProps {
   onAnalyze: (ticker: string, profile: UserProfile) => void;
@@ -38,13 +40,33 @@ const getDataMode = (): 'live' | 'demo' => {
 
 export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
   const [ticker, setTicker] = useState('');
-  const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>('moderate');
-  const [horizon, setHorizon] = useState<InvestmentHorizon>('5-10');
-  const [objective, setObjective] = useState<InvestmentObjective>('growth');
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(true);
+  const [investmentProfile, setInvestmentProfile] = useState<{
+    riskTolerance: RiskTolerance;
+    investmentHorizon: '1-3 years' | '5-10 years' | '10+ years';
+    investmentObjective: 'growth' | 'income' | 'balanced';
+  }>({
+    riskTolerance: 'moderate',
+    investmentHorizon: '5-10 years',
+    investmentObjective: 'growth',
+  });
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const dataMode = useMemo(() => getDataMode(), []);
   const isLiveMode = dataMode === 'live';
+
+  // Map investment profile format to UserProfile format
+  const horizonMap: Record<string, InvestmentHorizon> = {
+    '1-3 years': '1-3',
+    '5-10 years': '5-10',
+    '10+ years': '10+',
+  };
+
+  const objectiveMap: Record<string, InvestmentObjective> = {
+    'growth': 'growth',
+    'income': 'income',
+    'balanced': 'balanced',
+  };
   
   // In demo mode, only show demo tickers; in live mode, show all popular tickers
   const quickSelectTickers = isLiveMode 
@@ -69,9 +91,9 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
     setValidationError(null);
 
     onAnalyze?.(normalizedTicker, {
-      riskTolerance,
-      horizon,
-      objective,
+      riskTolerance: investmentProfile.riskTolerance,
+      horizon: horizonMap[investmentProfile.investmentHorizon],
+      objective: objectiveMap[investmentProfile.investmentObjective],
     });
   };
 
@@ -108,122 +130,125 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Ticker Input */}
+        {/* Ticker Input - Toggle between old and new */}
         <div>
-          <label htmlFor="ticker" className="block text-sm font-medium text-ai-text mb-2">
-            Stock Ticker
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-ai-muted" />
-            <input
-              type="text"
-              id="ticker"
-              list="ticker-suggestions"
-              value={ticker}
-              onChange={(e) => {
-                setTicker(e?.target?.value ?? '');
-                setValidationError(null);
-              }}
-              placeholder={isLiveMode ? "Enter any ticker (e.g., AAPL, AMZN)" : "Select from available tickers"}
-              className="w-full pl-10 pr-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text placeholder-ai-muted focus:outline-none focus:ring-2 focus:ring-ai-primary uppercase"
-              disabled={isLoading}
-              autoComplete="off"
-            />
-            <datalist id="ticker-suggestions">
-              {POPULAR_TICKERS.map(({ symbol, name }) => (
-                <option key={symbol} value={symbol}>{name}</option>
-              ))}
-            </datalist>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-ai-text">
+              Stock Ticker
+            </label>
+            <button
+              type="button"
+              onClick={() => setUseAdvancedSearch(!useAdvancedSearch)}
+              className="text-xs text-ai-accent hover:text-ai-primary transition-colors"
+            >
+              {useAdvancedSearch ? 'Use Quick Select' : 'Use Advanced Search'}
+            </button>
           </div>
-          
-          {/* Quick Select Buttons */}
-          <div className="mt-3">
-            <p className="text-xs text-ai-muted mb-2">
-              {isLiveMode ? 'Quick select:' : 'Available in demo mode:'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {quickSelectTickers.map(({ symbol, name }) => (
-                <button
-                  key={symbol}
-                  type="button"
-                  onClick={() => handleQuickSelect(symbol)}
+
+          {useAdvancedSearch ? (
+            <>
+              <StockSearchInput
+                value={ticker}
+                onChange={setTicker}
+                onSelect={(symbol) => {
+                  setTicker(symbol);
+                  setValidationError(null);
+                }}
+                placeholder="Search stocks, ETFs, funds..."
+                disabled={isLoading}
+              />
+              <div className="mt-3">
+                <p className="text-xs text-ai-muted mb-2">Popular quick select:</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickSelectTickers.slice(0, 7).map(({ symbol, name }) => (
+                    <button
+                      key={symbol}
+                      type="button"
+                      onClick={() => handleQuickSelect(symbol)}
+                      disabled={isLoading}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        ticker === symbol
+                          ? 'bg-ai-primary text-white'
+                          : 'bg-ai-bg border border-gray-700 text-ai-text hover:border-ai-primary hover:text-ai-primary'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={name}
+                    >
+                      {symbol}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-ai-muted" />
+                <input
+                  type="text"
+                  id="ticker"
+                  list="ticker-suggestions"
+                  value={ticker}
+                  onChange={(e) => {
+                    setTicker(e?.target?.value ?? '');
+                    setValidationError(null);
+                  }}
+                  placeholder={isLiveMode ? "Enter any ticker (e.g., AAPL, AMZN)" : "Select from available tickers"}
+                  className="w-full pl-10 pr-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text placeholder-ai-muted focus:outline-none focus:ring-2 focus:ring-ai-primary uppercase"
                   disabled={isLoading}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                    ticker === symbol
-                      ? 'bg-ai-primary text-white'
-                      : 'bg-ai-bg border border-gray-700 text-ai-text hover:border-ai-primary hover:text-ai-primary'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={name}
-                >
-                  {symbol}
-                </button>
-              ))}
-            </div>
-          </div>
-          
+                  autoComplete="off"
+                />
+                <datalist id="ticker-suggestions">
+                  {POPULAR_TICKERS.map(({ symbol, name }) => (
+                    <option key={symbol} value={symbol}>{name}</option>
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="mt-3">
+                <p className="text-xs text-ai-muted mb-2">
+                  {isLiveMode ? 'Quick select:' : 'Available in demo mode:'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {quickSelectTickers.map(({ symbol, name }) => (
+                    <button
+                      key={symbol}
+                      type="button"
+                      onClick={() => handleQuickSelect(symbol)}
+                      disabled={isLoading}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        ticker === symbol
+                          ? 'bg-ai-primary text-white'
+                          : 'bg-ai-bg border border-gray-700 text-ai-text hover:border-ai-primary hover:text-ai-primary'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={name}
+                    >
+                      {symbol}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           {!isLiveMode && (
             <p className="text-xs text-ai-muted mt-3 p-2 bg-ai-bg/50 rounded border border-gray-700/50">
-              💡 <strong>Want any ticker?</strong> Set <code className="text-ai-accent">NEXT_PUBLIC_MARKET_DATA_PROVIDER=alpha_vantage</code> and add your API key to enable live data.
+              <strong>Want any ticker?</strong> Set <code className="text-ai-accent">NEXT_PUBLIC_MARKET_DATA_PROVIDER=alpha_vantage</code> and add your API key to enable live data.
             </p>
           )}
-          
+
           {validationError && (
             <p className="mt-2 text-xs text-red-400">{validationError}</p>
           )}
         </div>
 
-        {/* Risk Tolerance */}
+        {/* Investment Profile - New Enhanced Component */}
         <div>
-          <label htmlFor="risk" className="block text-sm font-medium text-ai-text mb-2">
-            Risk Tolerance
-          </label>
-          <select
-            id="risk"
-            value={riskTolerance}
-            onChange={(e) => setRiskTolerance(e?.target?.value as RiskTolerance)}
-            className="w-full px-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text focus:outline-none focus:ring-2 focus:ring-ai-primary"
+          <h3 className="text-lg font-semibold text-ai-text mb-4">Investment Profile</h3>
+          <InvestmentProfileSelector
+            value={investmentProfile}
+            onChange={setInvestmentProfile}
             disabled={isLoading}
-          >
-            <option value="low">Low - Conservative</option>
-            <option value="moderate">Moderate - Balanced</option>
-            <option value="high">High - Aggressive</option>
-          </select>
-        </div>
-
-        {/* Investment Horizon */}
-        <div>
-          <label htmlFor="horizon" className="block text-sm font-medium text-ai-text mb-2">
-            Investment Horizon
-          </label>
-          <select
-            id="horizon"
-            value={horizon}
-            onChange={(e) => setHorizon(e?.target?.value as InvestmentHorizon)}
-            className="w-full px-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text focus:outline-none focus:ring-2 focus:ring-ai-primary"
-            disabled={isLoading}
-          >
-            <option value="1-3">1-3 Years - Short Term</option>
-            <option value="5-10">5-10 Years - Medium Term</option>
-            <option value="10+">10+ Years - Long Term</option>
-          </select>
-        </div>
-
-        {/* Investment Objective */}
-        <div>
-          <label htmlFor="objective" className="block text-sm font-medium text-ai-text mb-2">
-            Investment Objective
-          </label>
-          <select
-            id="objective"
-            value={objective}
-            onChange={(e) => setObjective(e?.target?.value as InvestmentObjective)}
-            className="w-full px-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text focus:outline-none focus:ring-2 focus:ring-ai-primary"
-            disabled={isLoading}
-          >
-            <option value="growth">Growth - Capital Appreciation</option>
-            <option value="income">Income - Dividends & Yield</option>
-            <option value="balanced">Balanced - Mixed Approach</option>
-          </select>
+          />
         </div>
 
         {/* Submit Button */}
