@@ -35,7 +35,12 @@ const getDataMode = (): 'live' | 'demo' => {
   if (typeof window === 'undefined') return 'demo';
   const provider = process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
   const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
-  return provider === 'alpha_vantage' && apiKey ? 'live' : 'demo';
+
+  // Live mode when using Yahoo (no key needed) or Alpha Vantage (with key)
+  if (provider === 'yahoo') return 'live';
+  if (provider === 'alpha_vantage' && apiKey) return 'live';
+
+  return 'demo';
 };
 
 export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
