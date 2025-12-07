@@ -143,13 +143,13 @@ export class MockMarketDataService implements MarketDataService {
  * Selects between the mock demo dataset and real providers based on env config.
  *
  * Supported providers:
- * - 'yahoo': Yahoo Finance (free, no API key required) - DEFAULT for live data
+ * - 'yahoo': Yahoo Finance (free, no API key required)
  * - 'alpha_vantage': Alpha Vantage (requires API key)
- * - 'demo': Mock data (5 demo tickers)
+ * - 'demo': Mock data (5 demo tickers) - DEFAULT for safety/testing
  */
 export function createMarketDataService(): MarketDataService {
   const providerPreference =
-    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'yahoo';
+    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
 
   // Yahoo Finance (default, no API key needed)
   if (providerPreference === 'yahoo') {
@@ -195,7 +195,7 @@ export const marketDataService: MarketDataService = createMarketDataService();
  */
 export function getMarketDataMode(): 'live' | 'demo' {
   const providerPreference =
-    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'yahoo';
+    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
 
   // Yahoo Finance is live by default (no API key needed)
   if (providerPreference === 'yahoo') {
