@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, TrendingUp } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, TrendingUp, Zap, Database } from 'lucide-react';
 import { UserProfile, RiskTolerance, InvestmentHorizon, InvestmentObjective } from '@/lib/domain/AnalysisTypes';
 
 interface StockFormProps {
@@ -9,12 +9,47 @@ interface StockFormProps {
   isLoading: boolean;
 }
 
+// Demo mode tickers (available without API key)
+const DEMO_TICKERS = ['AAPL', 'MSFT', 'TSLA', 'GOOGL', 'NVDA'] as const;
+
+// Popular tickers for quick selection (when live data is available)
+const POPULAR_TICKERS = [
+  { symbol: 'AAPL', name: 'Apple' },
+  { symbol: 'MSFT', name: 'Microsoft' },
+  { symbol: 'GOOGL', name: 'Alphabet' },
+  { symbol: 'AMZN', name: 'Amazon' },
+  { symbol: 'NVDA', name: 'NVIDIA' },
+  { symbol: 'META', name: 'Meta' },
+  { symbol: 'TSLA', name: 'Tesla' },
+  { symbol: 'JPM', name: 'JPMorgan' },
+  { symbol: 'V', name: 'Visa' },
+  { symbol: 'JNJ', name: 'J&J' },
+  { symbol: 'WMT', name: 'Walmart' },
+  { symbol: 'PG', name: 'P&G' },
+] as const;
+
+// Check if we're in live data mode
+const getDataMode = (): 'live' | 'demo' => {
+  if (typeof window === 'undefined') return 'demo';
+  const provider = process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
+  const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
+  return provider === 'alpha_vantage' && apiKey ? 'live' : 'demo';
+};
+
 export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
   const [ticker, setTicker] = useState('');
   const [riskTolerance, setRiskTolerance] = useState<RiskTolerance>('moderate');
   const [horizon, setHorizon] = useState<InvestmentHorizon>('5-10');
   const [objective, setObjective] = useState<InvestmentObjective>('growth');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const dataMode = useMemo(() => getDataMode(), []);
+  const isLiveMode = dataMode === 'live';
+  
+  // In demo mode, only show demo tickers; in live mode, show all popular tickers
+  const quickSelectTickers = isLiveMode 
+    ? POPULAR_TICKERS 
+    : POPULAR_TICKERS.filter(t => DEMO_TICKERS.includes(t.symbol as typeof DEMO_TICKERS[number]));
 
   const handleSubmit = (e: React.FormEvent) => {
     e?.preventDefault?.();
@@ -24,20 +59,52 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
       return;
     }
 
+    // In demo mode, validate against available tickers
+    const normalizedTicker = ticker.trim().toUpperCase();
+    if (!isLiveMode && !DEMO_TICKERS.includes(normalizedTicker as typeof DEMO_TICKERS[number])) {
+      setValidationError(`Demo mode only supports: ${DEMO_TICKERS.join(', ')}. Configure Alpha Vantage API for any ticker.`);
+      return;
+    }
+
     setValidationError(null);
 
-    onAnalyze?.(ticker?.toUpperCase?.(), {
+    onAnalyze?.(normalizedTicker, {
       riskTolerance,
       horizon,
       objective,
     });
   };
 
+  const handleQuickSelect = (symbol: string) => {
+    setTicker(symbol);
+    setValidationError(null);
+  };
+
   return (
     <div className="bg-ai-card rounded-lg shadow-lg p-8">
-      <div className="flex items-center gap-3 mb-6">
-        <TrendingUp className="h-6 w-6 text-ai-accent" />
-        <h2 className="text-2xl font-bold text-ai-text">Stock Analysis</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <TrendingUp className="h-6 w-6 text-ai-accent" />
+          <h2 className="text-2xl font-bold text-ai-text">Stock Analysis</h2>
+        </div>
+        {/* Data Mode Indicator */}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+          isLiveMode 
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+        }`}>
+          {isLiveMode ? (
+            <>
+              <Zap className="h-3 w-3" />
+              <span>Live Data</span>
+            </>
+          ) : (
+            <>
+              <Database className="h-3 w-3" />
+              <span>Demo Mode</span>
+            </>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -51,16 +118,57 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
             <input
               type="text"
               id="ticker"
+              list="ticker-suggestions"
               value={ticker}
-              onChange={(e) => setTicker(e?.target?.value ?? '')}
-              placeholder="e.g., AAPL, MSFT, TSLA"
-              className="w-full pl-10 pr-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text placeholder-ai-muted focus:outline-none focus:ring-2 focus:ring-ai-primary"
+              onChange={(e) => {
+                setTicker(e?.target?.value ?? '');
+                setValidationError(null);
+              }}
+              placeholder={isLiveMode ? "Enter any ticker (e.g., AAPL, AMZN)" : "Select from available tickers"}
+              className="w-full pl-10 pr-4 py-3 bg-ai-bg border border-gray-700 rounded-lg text-ai-text placeholder-ai-muted focus:outline-none focus:ring-2 focus:ring-ai-primary uppercase"
               disabled={isLoading}
+              autoComplete="off"
             />
+            <datalist id="ticker-suggestions">
+              {POPULAR_TICKERS.map(({ symbol, name }) => (
+                <option key={symbol} value={symbol}>{name}</option>
+              ))}
+            </datalist>
           </div>
-          <p className="text-xs text-ai-muted mt-1">Available: AAPL, MSFT, TSLA, GOOGL, NVDA</p>
+          
+          {/* Quick Select Buttons */}
+          <div className="mt-3">
+            <p className="text-xs text-ai-muted mb-2">
+              {isLiveMode ? 'Quick select:' : 'Available in demo mode:'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {quickSelectTickers.map(({ symbol, name }) => (
+                <button
+                  key={symbol}
+                  type="button"
+                  onClick={() => handleQuickSelect(symbol)}
+                  disabled={isLoading}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    ticker === symbol
+                      ? 'bg-ai-primary text-white'
+                      : 'bg-ai-bg border border-gray-700 text-ai-text hover:border-ai-primary hover:text-ai-primary'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={name}
+                >
+                  {symbol}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {!isLiveMode && (
+            <p className="text-xs text-ai-muted mt-3 p-2 bg-ai-bg/50 rounded border border-gray-700/50">
+              💡 <strong>Want any ticker?</strong> Set <code className="text-ai-accent">NEXT_PUBLIC_MARKET_DATA_PROVIDER=alpha_vantage</code> and add your API key to enable live data.
+            </p>
+          )}
+          
           {validationError && (
-            <p className="mt-1 text-xs text-red-400">{validationError}</p>
+            <p className="mt-2 text-xs text-red-400">{validationError}</p>
           )}
         </div>
 

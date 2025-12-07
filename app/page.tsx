@@ -16,7 +16,7 @@ import {
 } from '@/lib/domain/AnalysisTypes';
 import { analyzeStock } from '@/lib/domain/auroraEngine';
 import { buildActiveManagerRecommendation } from '@/lib/domain/activeManagerEngine';
-import { marketDataService } from '@/lib/services/marketDataService';
+import { marketDataService, getMarketDataMode, DEMO_TICKERS } from '@/lib/services/marketDataService';
 import {
   calculateAllocation,
   calculatePortfolioMetrics,
@@ -43,7 +43,6 @@ interface UserFriendlyError {
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 500;
-const DEMO_TICKERS = ['AAPL', 'MSFT', 'TSLA', 'GOOGL', 'NVDA'];
 type HistoricalPeriod = HistoricalData['period'];
 const HISTORICAL_PERIODS: HistoricalPeriod[] = ['1M', '3M', '6M', '1Y', '5Y'];
 
@@ -157,12 +156,18 @@ const buildUserFriendlyError = (
 
   const rawMessage = error instanceof Error ? error.message : '';
   const normalized = rawMessage.toLowerCase();
+  const dataMode = getMarketDataMode();
+  const isLiveMode = dataMode === 'live';
 
-  if (normalized.includes('demo dataset') || normalized.includes('available tickers')) {
+  // Demo mode ticker not found
+  if (normalized.includes('demo dataset') || normalized.includes('available tickers') || 
+      (normalized.includes('not found') && !isLiveMode)) {
     return {
       category: 'data',
-      message: 'This ticker is not available in the demo dataset.',
-      suggestion: `Try one of: ${DEMO_TICKERS.join(', ')}.`,
+      message: 'This ticker is not available in demo mode.',
+      suggestion: isLiveMode 
+        ? 'Try a different ticker symbol.'
+        : `Demo mode supports: ${DEMO_TICKERS.join(', ')}. Configure Alpha Vantage API for any ticker.`,
     };
   }
 
@@ -174,11 +179,23 @@ const buildUserFriendlyError = (
     };
   }
 
-  if (normalized.includes('not found')) {
+  // Live mode ticker not found (Alpha Vantage)
+  if (normalized.includes('not found') || normalized.includes('did not return')) {
     return {
       category: 'data',
       message: 'We could not find stock data for that ticker.',
-      suggestion: `Try one of: ${DEMO_TICKERS.join(', ')}.`,
+      suggestion: isLiveMode 
+        ? 'Verify the ticker symbol exists and try again.'
+        : `Try one of the demo tickers: ${DEMO_TICKERS.join(', ')}.`,
+    };
+  }
+
+  // Alpha Vantage rate limit
+  if (normalized.includes('rate limit') || normalized.includes('api call frequency')) {
+    return {
+      category: 'network',
+      message: 'API rate limit reached.',
+      suggestion: 'Alpha Vantage has a 5 calls/minute limit on free plans. Wait a moment and try again.',
     };
   }
 
@@ -215,7 +232,9 @@ const buildUserFriendlyError = (
     data: {
       category: 'data',
       message: 'We were unable to process that ticker.',
-      suggestion: `Verify the ticker symbol or try one of: ${DEMO_TICKERS.join(', ')}.`,
+      suggestion: isLiveMode 
+        ? 'Verify the ticker symbol and try again.'
+        : `Try one of the demo tickers: ${DEMO_TICKERS.join(', ')}.`,
     },
     analysis: {
       category: 'analysis',

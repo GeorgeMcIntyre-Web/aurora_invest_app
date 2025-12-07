@@ -175,6 +175,41 @@ export function createMarketDataService(): MarketDataService {
 // Default service instance used by the app
 export const marketDataService: MarketDataService = createMarketDataService();
 
+/**
+ * Returns the current data mode: 'live' (Alpha Vantage) or 'demo' (mock data).
+ * Useful for UI indicators and validation logic.
+ */
+export function getMarketDataMode(): 'live' | 'demo' {
+  const providerPreference =
+    process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
+  const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
+
+  if (providerPreference === 'alpha_vantage' && apiKey) {
+    return 'live';
+  }
+
+  return 'demo';
+}
+
+/**
+ * List of tickers available in demo mode.
+ */
+export const DEMO_TICKERS = ['AAPL', 'MSFT', 'TSLA', 'GOOGL', 'NVDA'] as const;
+
+/**
+ * Check if a ticker is available in the current data mode.
+ * In live mode, any ticker is valid. In demo mode, only DEMO_TICKERS are valid.
+ */
+export function isTickerAvailable(ticker: string): boolean {
+  const normalized = ticker?.trim?.()?.toUpperCase?.();
+  if (!normalized) return false;
+
+  const mode = getMarketDataMode();
+  if (mode === 'live') return true;
+
+  return DEMO_TICKERS.includes(normalized as typeof DEMO_TICKERS[number]);
+}
+
 function parseEnvNumber(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
