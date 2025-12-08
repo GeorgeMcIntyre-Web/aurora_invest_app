@@ -11,6 +11,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * Returns array of search results with ticker, name, type, exchange
  */
 
+// Mark as dynamic to prevent static generation
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 interface SearchResult {
   symbol: string;
   name: string;
