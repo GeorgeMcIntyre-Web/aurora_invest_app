@@ -36,11 +36,13 @@ jobs:
         run: npm run build
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          NEXT_PUBLIC_MARKET_DATA_PROVIDER: demo
+          NEXT_PUBLIC_MARKET_DATA_PROVIDER: yahoo
           NEXT_PUBLIC_MARKET_DATA_TIMEOUT_MS: 10000
           NEXT_PUBLIC_MARKET_DATA_MAX_RETRIES: 2
           NEXT_PUBLIC_MARKET_DATA_BACKOFF_MS: 500
           NEXT_PUBLIC_ALPHA_VANTAGE_OUTPUT_SIZE: compact
+          NEXT_PUBLIC_AI_VERIFICATION_PROVIDER: deepseek
+          NEXT_PUBLIC_DEEP_VERIFICATION_ENDPOINT: /api/ai-analysis
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
