@@ -10,7 +10,10 @@
     "test:watch": "vitest"
   },
   "resolutions": {
-    "regl": "npm:@plotly/regl@2.1.2"
+    "regl": "@plotly/regl@2.1.2"
+  },
+  "overrides": {
+    "regl": "@plotly/regl@2.1.2"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"
