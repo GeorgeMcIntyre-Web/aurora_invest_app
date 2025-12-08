@@ -19,7 +19,6 @@
     "seed": "tsx --require dotenv/config scripts/seed.ts"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@next/swc-wasm-nodejs": "13.5.1",
     "@types/node": "20.19.1",
     "@types/react": "18.2.22",
