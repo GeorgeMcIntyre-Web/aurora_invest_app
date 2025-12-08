@@ -1,8 +1,8 @@
-# AuroraInvest Stock Analyzer MVP
+# AuroraInvest Stock Analyzer
 
 ![AuroraInvest](./public/og-image.png)
 
-A production-ready investment analysis tool that provides comprehensive stock analysis with fundamentals, technicals, sentiment, and scenario-based planning guidance.
+A production-ready investment analysis tool that provides comprehensive stock analysis with fundamentals, technicals, sentiment, and scenario-based planning guidance. Now with real-time Yahoo Finance data for all stocks!
 
 ## 🎯 Features
 
