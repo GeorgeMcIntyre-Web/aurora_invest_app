@@ -111,7 +111,7 @@ export function InvestmentProfileSelector({
         <label className="block text-sm font-medium text-gray-300 mb-3">
           Risk Tolerance
         </label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           {RISK_OPTIONS.map((option) => {
             const Icon = option.icon;
             const isSelected = value.riskTolerance === option.value;
@@ -121,23 +121,23 @@ export function InvestmentProfileSelector({
                 type="button"
                 onClick={() => handleChange('riskTolerance', option.value)}
                 disabled={disabled}
-                className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                className={`relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
                   isSelected
                     ? 'border-emerald-500 bg-emerald-500/10'
                     : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <Icon
-                    className={`h-5 w-5 flex-shrink-0 ${
+                    className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
                       isSelected ? 'text-emerald-400' : 'text-gray-400'
                     }`}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className={`font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
+                    <div className={`text-sm sm:text-base font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
                       {option.label}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{option.description}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 sm:mt-1 line-clamp-2">{option.description}</div>
                   </div>
                 </div>
                 {isSelected && (
@@ -154,7 +154,7 @@ export function InvestmentProfileSelector({
         <label className="block text-sm font-medium text-gray-300 mb-3">
           Investment Horizon
         </label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           {HORIZON_OPTIONS.map((option) => {
             const Icon = option.icon;
             const isSelected = value.investmentHorizon === option.value;
@@ -164,20 +164,20 @@ export function InvestmentProfileSelector({
                 type="button"
                 onClick={() => handleChange('investmentHorizon', option.value)}
                 disabled={disabled}
-                className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                className={`relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
                   isSelected
                     ? 'border-emerald-500 bg-emerald-500/10'
                     : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <Icon
-                    className={`h-5 w-5 flex-shrink-0 ${
+                    className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
                       isSelected ? 'text-emerald-400' : 'text-gray-400'
                     }`}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className={`font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
+                    <div className={`text-sm sm:text-base font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
                       {option.label}
                     </div>
                     <div className="text-sm text-gray-300 mt-0.5">{option.description}</div>
@@ -198,7 +198,7 @@ export function InvestmentProfileSelector({
         <label className="block text-sm font-medium text-gray-300 mb-3">
           Investment Objective
         </label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           {OBJECTIVE_OPTIONS.map((option) => {
             const Icon = option.icon;
             const isSelected = value.investmentObjective === option.value;
@@ -208,23 +208,23 @@ export function InvestmentProfileSelector({
                 type="button"
                 onClick={() => handleChange('investmentObjective', option.value)}
                 disabled={disabled}
-                className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                className={`relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
                   isSelected
                     ? 'border-emerald-500 bg-emerald-500/10'
                     : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <Icon
-                    className={`h-5 w-5 flex-shrink-0 ${
+                    className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${
                       isSelected ? 'text-emerald-400' : 'text-gray-400'
                     }`}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className={`font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
+                    <div className={`text-sm sm:text-base font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
                       {option.label}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{option.description}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 sm:mt-1 line-clamp-2">{option.description}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{option.detail}</div>
                   </div>
                 </div>

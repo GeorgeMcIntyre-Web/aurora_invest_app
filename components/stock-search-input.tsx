@@ -67,7 +67,7 @@ export function StockSearchInput({
 
   // Handle input change with debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newQuery = e.target.value;
+    const newQuery = e.target.value.toUpperCase();
     setQuery(newQuery);
     onChange(newQuery);
 
