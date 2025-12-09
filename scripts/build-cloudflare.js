@@ -28,18 +28,11 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-// Run Next.js build
-console.log('\n🏗️  Building Next.js with environment variables...\n');
+// Run Next.js build (will create 'out' directory for static export)
+console.log('\n🏗️  Building Next.js static export with environment variables...\n');
 execSync('next build', {
   stdio: 'inherit',
   env: process.env
 });
 
-// Remove cache directory (cross-platform)
-const cacheDir = path.join(__dirname, '..', '.next', 'cache');
-if (fs.existsSync(cacheDir)) {
-  fs.rmSync(cacheDir, { recursive: true, force: true });
-  console.log('\n🗑️  Removed .next/cache directory\n');
-}
-
-console.log('\n✅ Build complete!\n');
+console.log('\n✅ Static export complete!\n');
