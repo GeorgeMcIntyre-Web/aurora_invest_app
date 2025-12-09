@@ -19,7 +19,14 @@
       "Bash(git stash:*)",
       "Bash(npx tsc:*)",
       "Bash(git fetch:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(npm view:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm ls:*)",
+      "Bash(yarn install:*)",
+      "Bash(npm ci:*)",
+      "Bash(chmod:*)",
+      "Bash(node scripts/build-cloudflare.js:*)"
     ],
     "deny": [],
     "ask": []
