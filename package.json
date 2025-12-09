@@ -10,7 +10,7 @@
     "test:watch": "vitest"
   },
   "resolutions": {
-    "**/regl": "@plotly/regl"
+    "regl": "@plotly/regl"
   },
   "overrides": {
     "regl": "@plotly/regl@2.1.2"
