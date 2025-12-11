@@ -11,7 +11,8 @@
  * - Technical indicators
  * - Support for stocks, ETFs, mutual funds
  *
- * Note: Yahoo Finance API is unofficial and subject to change
+ * Note: In browser environments, requests are proxied through /api/market-data
+ * to avoid CORS issues with Yahoo Finance API.
  */
 
 import { MarketDataService } from '../marketDataService';
@@ -33,6 +34,13 @@ interface YahooQuote {
   sharesOutstanding?: number;
   shortName?: string;
   longName?: string;
+}
+
+interface YahooQuoteResponse {
+  quoteResponse?: {
+    result?: YahooQuote[];
+    error?: { code: string; description: string };
+  };
 }
 
 interface YahooChartData {
@@ -92,8 +100,26 @@ interface YahooFinancialData {
   };
 }
 
+/**
+ * Detects if code is running in a browser environment
+ */
+function isBrowser(): boolean {
+  return typeof window !== 'undefined' && typeof window.document !== 'undefined';
+}
+
+/**
+ * Returns the proxy API base URL for browser environments
+ */
+function getProxyBaseUrl(): string {
+  if (!isBrowser()) {
+    return '';
+  }
+  // Use relative URL so it works on any domain
+  return '/api/market-data';
+}
+
 export class YahooFinanceService implements MarketDataService {
-  private readonly BASE_URL = 'https://query2.finance.yahoo.com';
+  private readonly YAHOO_BASE_URL = 'https://query2.finance.yahoo.com';
   private readonly timeout: number;
   private readonly maxRetries: number;
   private readonly backoffMs: number;
@@ -106,26 +132,54 @@ export class YahooFinanceService implements MarketDataService {
 
   async fetchStockData(ticker: string): Promise<StockData> {
     try {
-      // Fetch quote data
-      const quoteData = await this.fetchWithRetry<YahooQuote>(
-        `${this.BASE_URL}/v7/finance/quote?symbols=${ticker}`
-      );
+      // In browser, use proxy; on server, call Yahoo directly
+      if (isBrowser()) {
+        return await this.fetchStockDataViaProxy(ticker);
+      }
 
-      // Fetch chart/historical data
+      // Server-side direct fetch
+      const quoteData = await this.fetchWithRetry<YahooQuoteResponse>(
+        `${this.YAHOO_BASE_URL}/v7/finance/quote?symbols=${ticker}`
+      );
+      const quote = quoteData.quoteResponse?.result?.[0];
+      if (!quote) {
+        throw new Error(`No data found for ticker ${ticker}`);
+      }
+
       const chartData = await this.fetchWithRetry<YahooChartData>(
-        `${this.BASE_URL}/v8/finance/chart/${ticker}?range=1y&interval=1d`
+        `${this.YAHOO_BASE_URL}/v8/finance/chart/${ticker}?range=1y&interval=1d`
       );
 
-      // Fetch financial data
       const financialData = await this.fetchWithRetry<YahooFinancialData>(
-        `${this.BASE_URL}/v10/finance/quoteSummary/${ticker}?modules=financialData,defaultKeyStatistics,earnings`
+        `${this.YAHOO_BASE_URL}/v10/finance/quoteSummary/${ticker}?modules=financialData,defaultKeyStatistics,earnings`
       );
 
-      return this.transformToStockData(ticker, quoteData, chartData, financialData);
+      return this.transformToStockData(ticker, quote, chartData, financialData);
     } catch (error) {
       console.error(`YahooFinanceService error for ${ticker}:`, error);
       throw new Error(`Failed to fetch data for ${ticker}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Fetches stock data via the Cloudflare Function proxy to avoid CORS
+   */
+  private async fetchStockDataViaProxy(ticker: string): Promise<StockData> {
+    const proxyUrl = getProxyBaseUrl();
+
+    // Fetch all three data types via proxy
+    const [quoteResponse, chartResponse, financialResponse] = await Promise.all([
+      this.fetchWithRetry<YahooQuoteResponse>(`${proxyUrl}?ticker=${ticker}&type=quote`),
+      this.fetchWithRetry<YahooChartData>(`${proxyUrl}?ticker=${ticker}&type=chart&range=1y`),
+      this.fetchWithRetry<YahooFinancialData>(`${proxyUrl}?ticker=${ticker}&type=financial`),
+    ]);
+
+    const quote = quoteResponse.quoteResponse?.result?.[0];
+    if (!quote) {
+      throw new Error(`No data found for ticker ${ticker}`);
+    }
+
+    return this.transformToStockData(ticker, quote, chartResponse, financialResponse);
   }
 
   async fetchHistoricalData(
@@ -144,9 +198,20 @@ export class YahooFinanceService implements MarketDataService {
 
       const range = rangeMap[period] || '6mo';
 
-      const chartData = await this.fetchWithRetry<YahooChartData>(
-        `${this.BASE_URL}/v8/finance/chart/${ticker}?range=${range}&interval=1d`
-      );
+      let chartData: YahooChartData;
+
+      if (isBrowser()) {
+        // Use proxy in browser
+        const proxyUrl = getProxyBaseUrl();
+        chartData = await this.fetchWithRetry<YahooChartData>(
+          `${proxyUrl}?ticker=${ticker}&type=chart&range=${range}`
+        );
+      } else {
+        // Direct fetch on server
+        chartData = await this.fetchWithRetry<YahooChartData>(
+          `${this.YAHOO_BASE_URL}/v8/finance/chart/${ticker}?range=${range}&interval=1d`
+        );
+      }
 
       const chart = chartData.chart?.result?.[0];
       if (!chart || !chart.timestamp || !chart.indicators?.quote?.[0]) {
@@ -193,25 +258,46 @@ export class YahooFinanceService implements MarketDataService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
+        // Different headers for proxy vs direct Yahoo API
+        const isProxyRequest = url.startsWith('/api/');
+        const headers: HeadersInit = isProxyRequest
+          ? { 'Accept': 'application/json' }
+          : {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json',
+            };
+
         const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
-          },
+          headers,
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Try to extract error message from response
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorBody = await response.json();
+            if (errorBody?.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch {
+            // Ignore JSON parse errors
+          }
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
         return data as T;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
+
+        // Don't retry on 4xx errors (client errors)
+        if (lastError.message.includes('HTTP 4')) {
+          throw lastError;
+        }
 
         if (attempt < this.maxRetries) {
           const delay = this.backoffMs * Math.pow(2, attempt);
