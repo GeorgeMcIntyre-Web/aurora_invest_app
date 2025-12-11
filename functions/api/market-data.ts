@@ -32,7 +32,11 @@ interface YahooQuoteResponse {
   };
 }
 
-const YAHOO_BASE_URL = 'https://query2.finance.yahoo.com';
+// Try multiple Yahoo Finance endpoints - some work better from different regions/IPs
+const YAHOO_ENDPOINTS = [
+  'https://query1.finance.yahoo.com',
+  'https://query2.finance.yahoo.com',
+];
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 const corsHeaders = {
@@ -59,8 +63,13 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
+        // Use a more complete set of browser headers to avoid being blocked
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       },
       signal: controller.signal,
     });
@@ -68,6 +77,33 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Try fetching from multiple Yahoo endpoints until one succeeds
+ */
+async function fetchFromYahooWithFallback(
+  path: string,
+  timeoutMs: number
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (const baseUrl of YAHOO_ENDPOINTS) {
+    try {
+      const response = await fetchWithTimeout(`${baseUrl}${path}`, timeoutMs);
+      // If we get a successful response or a client error (4xx), return it
+      // Only retry on server errors (5xx) or network issues
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      // Continue to next endpoint
+    }
+  }
+  
+  throw lastError || new Error('All Yahoo Finance endpoints failed');
 }
 
 /**
@@ -115,23 +151,23 @@ async function handleMarketDataRequest(
   const timeoutMs = parseInt(env.NEXT_PUBLIC_MARKET_DATA_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
 
   try {
-    let yahooUrl: string;
+    let yahooPath: string;
 
     switch (type) {
       case 'quote':
-        yahooUrl = `${YAHOO_BASE_URL}/v7/finance/quote?symbols=${encodeURIComponent(ticker)}`;
+        yahooPath = `/v7/finance/quote?symbols=${encodeURIComponent(ticker)}`;
         break;
       case 'chart':
-        yahooUrl = `${YAHOO_BASE_URL}/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
+        yahooPath = `/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
         break;
       case 'financial':
-        yahooUrl = `${YAHOO_BASE_URL}/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=financialData,defaultKeyStatistics,earnings`;
+        yahooPath = `/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=financialData,defaultKeyStatistics,earnings`;
         break;
       default:
         return createErrorResponse(`Unknown data type: ${type}`, 400);
     }
 
-    const response = await fetchWithTimeout(yahooUrl, timeoutMs);
+    const response = await fetchFromYahooWithFallback(yahooPath, timeoutMs);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');

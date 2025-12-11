@@ -119,7 +119,8 @@ function getProxyBaseUrl(): string {
 }
 
 export class YahooFinanceService implements MarketDataService {
-  private readonly YAHOO_BASE_URL = 'https://query2.finance.yahoo.com';
+  // query1 endpoint is more reliable from cloud servers
+  private readonly YAHOO_BASE_URL = 'https://query1.finance.yahoo.com';
   private readonly timeout: number;
   private readonly maxRetries: number;
   private readonly backoffMs: number;
