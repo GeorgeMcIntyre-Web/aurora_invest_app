@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Search, TrendingUp, Zap, Database } from 'lucide-react';
 import { UserProfile, RiskTolerance, InvestmentHorizon, InvestmentObjective } from '@/lib/domain/AnalysisTypes';
 import { StockSearchInput } from './stock-search-input';
@@ -31,8 +31,8 @@ const POPULAR_TICKERS = [
 ] as const;
 
 // Check if we're in live data mode
+// Note: NEXT_PUBLIC_* vars are replaced at build time, so we can check directly
 const getDataMode = (): 'live' | 'demo' => {
-  if (typeof window === 'undefined') return 'demo';
   const provider = process.env.NEXT_PUBLIC_MARKET_DATA_PROVIDER?.toLowerCase?.() ?? 'demo';
   const apiKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
 
@@ -42,6 +42,9 @@ const getDataMode = (): 'live' | 'demo' => {
 
   return 'demo';
 };
+
+// Determine mode at module load time (env vars are baked in at build)
+const DATA_MODE = getDataMode();
 
 export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
   const [ticker, setTicker] = useState('');
@@ -57,7 +60,7 @@ export function StockForm({ onAnalyze, isLoading }: StockFormProps) {
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const dataMode = useMemo(() => getDataMode(), []);
+  const dataMode = DATA_MODE;
   const isLiveMode = dataMode === 'live';
 
   // Map investment profile format to UserProfile format
